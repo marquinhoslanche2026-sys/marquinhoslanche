@@ -1,0 +1,127 @@
+/* =====================================================================
+   Marquinho's Lanches — estilos do painel administrativo
+   ===================================================================== */
+:root{color-scheme:dark;--bg:#101010;--card:#1b1b1b;--line:#343434;--text:#f5f2ed;--muted:#aaa;--red:#a31616;--gold:#f2b705;--green:#20834a;--danger:#bd2828}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px Barlow,Arial,sans-serif}
+h1,h2,h3{margin:0}
+h2{font-size:1.25rem}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer;border:0;border-radius:8px;padding:11px 14px;font-weight:700;color:inherit}
+button:disabled{opacity:.5;cursor:default}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.primary{background:var(--gold);color:#17130a}
+.secondary{background:#303030;color:#fff;border:1px solid #555}
+.danger{background:#651b1b;color:#fff;border:1px solid #b33}
+.ok{background:var(--green);color:#fff}
+.small{padding:8px 11px;font-size:.88rem}
+.hidden{display:none!important}
+.muted{color:var(--muted)}
+.hint{font-size:.88rem;color:#aaa}
+
+/* ---------- Estrutura ---------- */
+.top{background:#171717;border-bottom:3px solid var(--gold);padding:16px 22px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;position:sticky;top:0;z-index:20}
+.brand{font:32px 'Bebas Neue';letter-spacing:2px}
+.brand span{color:var(--gold)}
+.brand small{font:14px Barlow;color:#aaa;letter-spacing:0}
+#sessionBar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.wrap{max-width:1200px;margin:auto;padding:22px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.list{display:grid;gap:9px}
+.notice{padding:12px 14px;border-radius:9px;margin:12px 0;background:#382d08;border:1px solid #8e7109}
+.empty{padding:24px;text-align:center;color:var(--muted)}
+.login{max-width:430px;margin:8vh auto;background:var(--card);border:1px solid var(--line);padding:24px;border-radius:16px}
+.field{display:grid;gap:6px;margin:12px 0}
+.field input,.field select,.search{width:100%;background:#101010;border:1px solid #494949;color:#fff;border-radius:8px;padding:12px}
+.page-title{font:38px 'Bebas Neue';letter-spacing:.5px}
+
+/* ---------- Avisos (toast) ---------- */
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:60;background:#222;color:#fff;border:2px solid var(--gold);border-radius:10px;padding:12px 18px;max-width:calc(100vw - 24px);box-shadow:0 6px 24px #0008;font-weight:700}
+.toast.err{border-color:#e0533d}
+
+/* ---------- Indicadores ---------- */
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:20px 0}
+.stat,.panel{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:16px}
+.stat small{display:block;color:var(--muted)}
+.stat strong{display:block;font:30px 'Bebas Neue';margin-top:5px}
+
+/* ---------- Abas ---------- */
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}
+.tabs button{background:#262626;color:#ddd;border:1px solid #444;position:relative}
+.tabs button.active{background:var(--red);color:#fff;border-color:var(--gold)}
+.pill{display:inline-block;min-width:22px;padding:1px 7px;margin-left:6px;border-radius:99px;background:var(--gold);color:#17130a;font-size:.8rem;text-align:center}
+
+/* ---------- Pedidos ---------- */
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.filters .search{width:auto;min-width:150px}
+.order,.product{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:13px;background:#141414;border:1px solid #353535;border-radius:10px}
+.order.is-new{border-color:var(--gold);box-shadow:0 0 0 2px #f2b70533}
+.order .name,.product .name{font-weight:700}
+.meta{font-size:.9rem;color:var(--muted);margin-top:4px}
+.order-main{flex:1;min-width:200px}
+.order-items{margin:8px 0;padding:9px 11px;background:#0e0e0e;border-radius:8px;border:1px solid #2b2b2b;font-size:.95rem}
+.order-items div+div{margin-top:3px}
+.order-items small{color:var(--muted)}
+.order-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.order-actions .search{width:auto;max-width:210px;padding:9px 10px}
+.badge{display:inline-block;padding:4px 9px;border-radius:20px;background:#333;font-size:.8rem;white-space:nowrap}
+.received{background:#4c3500}.preparing{background:#123e70}.out_for_delivery{background:#53308b}.completed{background:#145a30}.cancelled{background:#5a2020}
+.wa-link{display:inline-block;padding:8px 11px;border-radius:8px;background:#1f7a3a;color:#fff;text-decoration:none;font-weight:700;font-size:.88rem}
+
+/* ---------- Disponibilidade ---------- */
+.cat-block{margin:18px 0 6px}
+.cat-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;background:#24201b;border:1px solid #494035;border-left:4px solid var(--gold);border-radius:10px;margin-bottom:8px}
+.cat-head h3{font-size:1.05rem}
+.cat-head .btns{margin-left:auto;display:flex;gap:6px}
+.switch{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.switch input{width:20px;height:20px;accent-color:var(--gold)}
+.off-row{opacity:.7;border-color:#6b2a2a}
+
+/* ---------- Promoções ---------- */
+.promo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.promo-section{margin:22px 0}
+.promo-section-head{display:flex;align-items:center;gap:10px;padding:12px 14px;margin-bottom:10px;background:#24201b;border:1px solid #494035;border-left:4px solid var(--gold);border-radius:10px}
+.promo-section-head h3{font-size:1.12rem}
+.promo-section-head span{margin-left:auto;color:var(--muted);font-size:.85rem}
+.promo-form-title{font:25px 'Bebas Neue';letter-spacing:.5px;margin:0 0 4px}
+.promo-form-sub{color:var(--muted);margin:0 0 14px}
+.promo-list-card{align-items:flex-start}
+.promo-pill{display:inline-block;padding:4px 8px;border-radius:6px;background:#382d08;border:1px solid #6c560c;color:#ffdb59;font-size:.76rem;font-weight:700;margin:0 5px 4px 0}
+.promo-actions{min-width:220px;justify-content:flex-end}
+.combo-product-groups{display:grid;gap:12px;margin-top:8px}
+.combo-product-category{border:1px solid #3c3c3c;border-radius:10px;overflow:hidden}
+.combo-product-category h4{margin:0;padding:10px 12px;background:#29251f;color:var(--gold);font-size:.95rem}
+.combo-product-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:8px}
+.combo-product-option{display:flex;align-items:flex-start;gap:9px;padding:10px;background:#111;border:1px solid #333;border-radius:8px;min-width:0}
+.combo-product-option input{width:18px;height:18px;flex-shrink:0;accent-color:var(--gold);margin-top:2px}
+.combo-product-option span{overflow-wrap:anywhere}
+.combo-product-option small{display:block;color:var(--muted);margin-top:3px}
+.combo-product-option:has(input:checked){border-color:var(--gold);background:#2a230d}
+
+/* ---------- Vendas ---------- */
+.chart-wrap{background:#121212;border:1px solid #333;border-radius:12px;padding:14px;overflow:hidden}
+.chart{width:100%;height:auto;display:block}
+.chart-label{fill:#aaa;font:12px Barlow,Arial}
+.chart-value{fill:#f2b705;font:700 12px Barlow,Arial}
+.rank{display:grid;gap:6px;margin-top:10px}
+.rank-row{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:9px 11px;background:#141414;border:1px solid #2f2f2f;border-radius:9px}
+.rank-row b:first-child{color:var(--gold)}
+.rank-bar{height:5px;background:#2a2a2a;border-radius:3px;margin-top:5px;overflow:hidden}
+.rank-bar i{display:block;height:100%;background:var(--red)}
+
+/* ---------- Responsivo ---------- */
+@media(max-width:760px){
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .wrap{padding:14px}
+  .top{padding:12px 14px;position:static}
+  .brand{font-size:27px}
+  .product,.order{align-items:flex-start}
+  .product{flex-direction:column}
+  .filters .search{flex:1}
+}
+@media(max-width:650px){
+  .promo-grid{grid-template-columns:1fr}
+  .promo-actions{min-width:0;justify-content:flex-start}
+  .promo-grid .field{margin:4px 0}
+}
+@media(max-width:520px){.combo-product-options{grid-template-columns:1fr}}

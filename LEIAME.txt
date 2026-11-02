@@ -1,0 +1,16 @@
+MARQUINHO'S LANCHES - SITE + PAINEL
+====================================
+PASTA COMPLETA: css/, assets/logo.jpg, js/ e paginas ja estao incluidos. Pode subir direto.
+
+ESTRUTURA
+  index.html / admin.html / backend-config.js
+  js/menu-data.js   -> CARDAPIO: unico lugar para editar precos e itens
+  js/site.js        -> logica do site
+  js/admin.js       -> logica do painel
+  ferramentas/      -> gerar-catalogo.js (gera catalog.json e sincronizar-produtos.sql)
+
+DEPOIS DE MUDAR PRECOS EM js/menu-data.js:
+  1) node ferramentas/gerar-catalogo.js
+  2) Abra ferramentas/sincronizar-produtos.sql, copie tudo e rode no Supabase (SQL Editor)
+  3) git add . ; git commit -m "Atualiza precos" ; git push   (o Cloudflare publica sozinho)
+NUNCA mude a ORDEM dos itens do cardapio: adicione sempre no FINAL da categoria.

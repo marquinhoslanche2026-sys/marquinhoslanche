@@ -1,0 +1,148 @@
+/* =====================================================================
+   Marquinho's Lanches — estilos do site (cardápio / delivery)
+   ===================================================================== */
+:root{
+  --red:#a31616;--mus:#f2b705;--bg:#f5f3ee;--cd:#fffefa;--tx:#201b18;--mu:#6b625b;--ln:#e4ddd3;--pr:#a31616;
+  --shadow:#eee5da;--bb:"Bebas Neue",Impact,sans-serif;
+}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){--bg:#101010;--cd:#1b1b1b;--tx:#f2f2ee;--mu:#aaa;--ln:#333;--pr:#f2b705;--shadow:#000}
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 130px);scroll-behavior:smooth}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 Barlow,system-ui,sans-serif;padding-top:env(safe-area-inset-top,0px)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:#161616;z-index:50}
+:focus-visible{outline:3px solid var(--mus);outline-offset:2px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- Topo ---------- */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:#161616;color:#fff;display:flex;align-items:center;gap:10px;padding:8px 14px;min-height:71px;border-bottom:3px solid var(--mus);box-shadow:0 3px 12px rgba(0,0,0,.14)}
+.brand{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;font:400 1.28rem/.95 var(--bb);letter-spacing:.07em}
+.brand span{color:var(--mus)}
+.brand b{display:block;font-weight:400}
+.r{margin-left:auto;display:flex;align-items:center;gap:8px}
+.s{font-size:.75rem;font-weight:700;padding:3px 9px;border-radius:99px;background:#1f7a3a;color:#fff;white-space:nowrap}
+.s.off{background:#6b6b6b}
+.lg{width:var(--s,52px);height:var(--s,52px);flex:none;border-radius:50%;overflow:hidden;background:#161616}
+.lg img{width:100%;height:100%;object-fit:cover;transform:scale(1.07);display:block}
+
+/* ---------- Botões ---------- */
+.btn,.wa,.add{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 18px;border-radius:999px;font:400 1.1rem var(--bb);letter-spacing:.06em;text-decoration:none;border:0;cursor:pointer;transition:transform .15s}
+.btn{background:var(--mus);color:#161616;box-shadow:0 3px 0 #8e6900}
+.wa{background:#25d366;color:#04230f;min-height:40px;padding:0 14px;font-size:1.02rem}
+.add{background:#201b18;color:var(--mus);min-height:40px;padding:0 16px;font-size:1rem}
+.btn:hover,.wa:hover,.add:hover{transform:translateY(-2px)}
+.btn:disabled,.wa[aria-disabled=true]{opacity:.6;pointer-events:none}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}.btn:hover,.wa:hover,.add:hover{transform:none}}
+
+/* ---------- Hero ---------- */
+.hero{background:radial-gradient(rgba(255,255,255,.12) 1px,transparent 1.5px) 0 0/12px 12px,linear-gradient(135deg,#7e1111,var(--red) 65%,#bd2820);color:#fff;padding:24px 18px 34px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:5px solid var(--mus)}
+.hero>div:first-child{max-width:570px}
+.hero .lg{--s:clamp(100px,22vw,170px);border:3px solid var(--mus);box-shadow:0 5px 0 rgba(0,0,0,.2)}
+h1{font:400 clamp(2.2rem,8vw,3.8rem)/.95 var(--bb);margin:0 0 10px;text-shadow:2px 3px 0 #201b18;letter-spacing:.02em}
+h1 em{color:var(--mus);font-style:normal}
+.hero p{font-size:.96rem;max-width:31ch;margin:0 0 12px}
+@media(min-width:700px){.hero{padding:32px max(24px,calc((100vw - 1000px)/2)) 38px}}
+
+/* ---------- Promoções ---------- */
+.promo-banner{margin:18px auto 20px;max-width:1100px;padding:22px 20px;border:2px solid #d5a51a;border-radius:18px;color:#fff8e8;background:radial-gradient(ellipse at 100% 0%,rgba(180,20,25,.6),transparent 45%),linear-gradient(125deg,#101010,#25100f 58%,#090909);box-shadow:0 12px 35px #0002;overflow:hidden;position:relative}
+.promo-banner::after{content:'%';position:absolute;right:16px;top:26px;font:100px 'Bebas Neue';color:#ffffff09;pointer-events:none}
+.promo-head{display:flex;align-items:center;justify-content:space-between;color:#ffd54a;font-weight:900;letter-spacing:.18em;font-size:.78rem}
+.promo-star{font-size:1.5rem}
+.promo-banner h2{font:400 clamp(1.8rem,5vw,3rem) 'Bebas Neue';margin:7px 0 14px;letter-spacing:.04em;background:none;color:inherit;padding:0;transform:none;display:block}
+.promo-banner h2 em{color:#ffd54a;font-style:normal}
+.promo-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px;position:relative;z-index:1}
+.promo-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px;border:1px solid #ffffff25;border-radius:12px;background:#ffffff0b}
+.promo-item b{display:block;font-size:1.03rem}
+.promo-item small{display:block;font-size:.8rem;color:#ddd}
+.promo-off{display:inline-block;margin-top:5px;padding:3px 7px;border-radius:6px;background:#a31616;color:#fff;font-size:.75rem;font-weight:800}
+.promo-prices{white-space:nowrap;text-align:right}
+.promo-old{text-decoration:line-through;color:#c5bdb6;font-size:.86rem}
+.promo-new{display:block;color:#ffe16b;font:400 1.65rem 'Bebas Neue'}
+.promo-foot{margin:14px 0 0;color:#d6c7ba;font-size:.85rem}
+@media(max-width:699px){.promo-banner{margin:12px;padding:17px 14px;border-radius:13px}.promo-banner::after{font-size:76px;right:6px;top:30px}.promo-item{padding:11px}}
+
+/* ---------- Navegação por categorias ---------- */
+.tabs{position:sticky;top:calc(env(safe-area-inset-top,0px) + 71px);z-index:15;display:flex;gap:7px;overflow-x:auto;padding:9px 12px;background:rgba(245,243,238,.97);backdrop-filter:blur(10px);border-bottom:1px solid var(--ln);scrollbar-width:none}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .tabs{background:rgba(16,16,16,.97)}}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:none;min-height:38px;padding:0 13px;border:1px solid #d4c9bb;border-radius:999px;font:400 1rem var(--bb);letter-spacing:.05em;background:var(--cd);color:var(--tx);box-shadow:0 2px 0 var(--shadow);cursor:pointer}
+.tabs button:active{background:var(--mus);color:#201b18}
+
+/* ---------- Cardápio ---------- */
+main{max-width:1000px;margin:0 auto;padding:14px 12px 120px}
+#q{width:100%;min-height:48px;padding:0 14px 0 42px;border:1px solid #d4c9bb;border-radius:14px;background:var(--cd) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") 13px center no-repeat;color:var(--tx);font:inherit;box-shadow:0 2px 0 var(--shadow);margin-bottom:12px}
+#q:focus{border-color:var(--red);outline:3px solid rgba(163,22,22,.12)}
+.category{margin:0 0 10px;border:1px solid var(--ln);border-radius:14px;background:var(--cd);overflow:hidden;box-shadow:0 3px 0 var(--shadow)}
+.category>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:60px;padding:12px 14px;cursor:pointer;font:400 1.25rem/1.15 var(--bb);letter-spacing:.025em}
+.category>summary::-webkit-details-marker{display:none}
+.category>summary::after{content:'+';display:grid;place-items:center;flex:none;width:29px;height:29px;border-radius:50%;background:var(--mus);color:#201b18;font:700 1.25rem/1 Barlow,system-ui,sans-serif}
+.category[open]>summary{background:#201b18;color:#fff;border-bottom:3px solid var(--red)}
+.category[open]>summary::after{content:'−';background:var(--red);color:#fff}
+.category>summary small{margin-left:auto;color:var(--mu);font:600 .78rem Barlow,system-ui,sans-serif;letter-spacing:0;white-space:nowrap}
+.category[open]>summary small{color:#e5d8c8}
+.g{display:grid;gap:10px;padding:12px;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr))}
+.it{background:var(--cd);border:1px solid var(--ln);border-radius:12px;padding:13px;display:flex;flex-direction:column;gap:9px;box-shadow:0 3px 0 var(--shadow)}
+.it h3{align-self:flex-start;margin:0;background:var(--red);color:#fff;padding:4px 10px;border-radius:5px 5px 5px 0;font:400 1.22rem/1.2 var(--bb);letter-spacing:.05em}
+.it h3 small{color:var(--mus);font-size:.72em}
+.it p{margin:0;color:var(--mu);font-size:.92rem;line-height:1.4;flex:1}
+.it .deal{font-weight:700;color:var(--pr)}
+.it .deal small{color:var(--mu);font-weight:400}
+.ft{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ft b{font:400 1.55rem var(--bb);color:var(--pr)}
+.ft del{display:block;font-size:.8rem;color:#888}
+.sz{display:grid;grid-template-columns:1fr auto auto;border-top:1px dashed var(--ln);padding-top:6px}
+.sz span{font-weight:700;line-height:1.1}
+.sz small{display:block;font-weight:400;color:var(--mu);font-size:.78rem}
+.st2{display:flex;align-items:center;gap:4px}
+.st2 button,.x{width:44px;height:44px;border:2px solid var(--tx);background:var(--cd);color:var(--tx);border-radius:8px;font-size:1.3rem;cursor:pointer}
+.st2 span{min-width:28px;text-align:center;font-weight:700}
+.unavailable{opacity:.58;filter:grayscale(.65)}
+.unavailable .add,.unavailable .st2{display:none}
+.stock-note{font-size:.8rem;color:#b42318;font-weight:700}
+.empty{padding:18px;background:var(--cd);border:1px solid var(--ln);border-radius:12px}
+@media(min-width:700px){.g{grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr))}}
+
+/* ---------- Informações e rodapé ---------- */
+.info{background:#161616;color:#fff;padding:24px 14px;border-top:5px solid var(--mus)}
+.info>div{max-width:1000px;margin:0 auto;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.info section{padding:14px;border:1px solid #38302b;border-radius:12px;background:#211d1a}
+.info h2{margin:0 0 8px;padding:0 0 7px;border-bottom:2px solid var(--red);font:400 1.35rem var(--bb);letter-spacing:.05em;color:var(--mus)}
+.info p{margin:0}
+.info a{color:var(--mus)}
+footer{background:#000;color:#aaa;text-align:center;font-size:.85rem;padding:16px 14px 24px}
+
+/* ---------- Barra do carrinho e avisos ---------- */
+.bar{position:fixed;left:10px;right:10px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:30;display:flex;justify-content:space-between;align-items:center;max-width:980px;margin:0 auto;min-height:58px;padding:8px 16px;background:#201b18;color:#fff;border:2px solid var(--mus);border-radius:14px;box-shadow:0 5px 20px rgba(0,0,0,.25);font:400 1.2rem var(--bb);letter-spacing:.05em;cursor:pointer}
+.toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:#161616;color:#fff;border:2px solid var(--mus);border-radius:9px;padding:11px 16px;box-shadow:0 5px 18px #0003;max-width:calc(100vw - 24px);text-align:center;font-weight:700}
+
+/* ---------- Janelas (carrinho, combos, pizza) ---------- */
+.dr{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
+.pn{background:var(--bg);width:100%;max-width:560px;max-height:92dvh;overflow-y:auto;border-radius:20px 20px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.2);padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.hd{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.hd h2{margin:0;padding:2px 14px;background:#161616;color:var(--mus);font:400 1.8rem/1.1 var(--bb);letter-spacing:.05em}
+.pn label{display:block;margin:10px 0 0;font-weight:600}
+.pn input[type=text],.pn input[type=tel],.pn select,.pn textarea{display:block;width:100%;margin-top:4px;padding:0 12px;border:1px solid var(--tx);border-radius:8px;background:var(--cd);color:var(--tx);font:inherit}
+.pn input[type=text],.pn input[type=tel],.pn select{min-height:44px}
+.pn textarea{min-height:100px;padding:12px 14px;resize:vertical;border-color:var(--ln);line-height:1.45}
+.pn textarea:focus{outline:3px solid var(--mus);outline-offset:2px}
+.pn input.invalid{border-color:#e0533d;background:rgba(224,83,61,.08)}
+fieldset{border:1px solid var(--ln);border-radius:8px;margin:12px 0 0;padding:4px 12px 10px}
+fieldset label{display:flex;gap:8px;align-items:center;min-height:44px;margin:0}
+.ln{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--ln)}
+.ln span{display:block;color:var(--pr);font-weight:700}
+.ln small{display:block;color:var(--mu);font-size:.8rem;line-height:1.25}
+.ln input{grid-column:1/-1;min-height:40px;padding:0 10px;border:1px solid var(--ln);border-radius:6px;background:var(--cd);color:var(--tx);font:inherit;font-size:.9rem}
+.lnhead{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.rmitem{width:42px;height:42px;border:1px solid #b42318;border-radius:8px;background:transparent;color:#b42318;font-size:1.2rem;cursor:pointer}
+.cart-help,.hint{margin:8px 0;color:var(--mu);font-size:.9rem}
+.closed-note{margin:10px 0 0;padding:10px 12px;border-radius:8px;background:#382d08;color:#ffe9a6;border:1px solid #8e7109;font-size:.9rem}
+.sum{display:flex;justify-content:space-between;margin-top:6px}
+.sum.t{font:400 1.7rem var(--bb);color:var(--pr)}
+.pix{border:2px dashed var(--tx);border-radius:10px;padding:12px;margin-top:14px;text-align:center}
+.err{color:#e0533d;font-weight:700;margin:10px 0 0}
+#send{width:100%;margin-top:14px;min-height:52px;font-size:1.4rem}
+#pzflavors fieldset{margin:8px 0}
+#pzflavors label{font-weight:400}
+@media(max-width:420px){.brand{font-size:1.08rem;gap:7px}.top{padding:7px 10px}.r{gap:5px}.wa{padding:0 10px;font-size:.94rem}.hero{padding:20px 14px 24px;gap:10px}.hero .lg{--s:82px}h1{font-size:2.25rem}.hero p{font-size:.9rem}.category>summary{font-size:1.17rem;min-height:56px;padding:11px}.category>summary small{font-size:.72rem}}

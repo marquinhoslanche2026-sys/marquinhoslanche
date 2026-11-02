@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Painel | Marquinho's Lanches</title>
+<link rel="icon" type="image/jpeg" href="assets/logo.jpg">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/admin.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="backend-config.js"></script>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">MARQUINHO'S <span>LANCHES</span> <small>/ PAINEL ADMINISTRATIVO</small></div>
+  <div id="sessionBar" class="hidden">
+    <label class="switch muted" title="Toca um aviso quando chegar pedido novo"><input id="soundToggle" type="checkbox" checked> Som de novo pedido</label>
+    <span id="userEmail" class="muted"></span>
+    <button id="logout" class="secondary small">Sair</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="setup" class="notice hidden"><b>Painel ainda não conectado ao Supabase.</b><br>Abra o arquivo <code>backend-config.js</code> (na mesma pasta do admin.html), troque os textos <code>COLE_AQUI…</code> pela URL do projeto e pela chave <i>anon public</i> (Supabase → Project Settings → API), salve, envie ao site e recarregue com Ctrl+F5. Se o arquivo não existir no site, é por isso que este aviso aparece.</section>
+
+  <!-- Login -->
+  <section id="login" class="login">
+    <h1 style="font:34px 'Bebas Neue'">Acesso administrativo</h1>
+    <p class="muted">Entre com o usuário autorizado no Supabase Auth.</p>
+    <form id="loginForm">
+      <label class="field">E-mail<input id="email" type="email" autocomplete="username" required></label>
+      <label class="field">Senha<input id="password" type="password" autocomplete="current-password" required></label>
+      <button class="primary" style="width:100%">Entrar no painel</button>
+    </form>
+    <p id="loginMsg" class="muted" role="status"></p>
+  </section>
+
+  <!-- Painel -->
+  <section id="app" class="hidden">
+    <div class="row">
+      <div>
+        <h1 class="page-title">Visão geral</h1>
+        <div class="muted">Pedidos e vendas registradas no banco de dados. <span id="lastUpdate"></span></div>
+      </div>
+      <button id="refresh" class="secondary">↻ Atualizar</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><small>Vendas concluídas hoje</small><strong id="sales">R$ 0,00</strong></div>
+      <div class="stat"><small>Pedidos concluídos hoje</small><strong id="doneCount">0</strong></div>
+      <div class="stat"><small>Pedidos em aberto</small><strong id="openCount">0</strong></div>
+      <div class="stat"><small>Ticket médio hoje</small><strong id="ticket">R$ 0,00</strong></div>
+    </div>
+
+    <nav class="tabs" aria-label="Seções do painel">
+      <button class="active" data-tab="orders">Pedidos <span id="newBadge" class="pill hidden">0</span></button>
+      <button data-tab="stock">Disponibilidade do cardápio</button>
+      <button data-tab="promotions">Banner de promoções</button>
+      <button data-tab="sales">Resumo de vendas</button>
+    </nav>
+
+    <!-- Pedidos -->
+    <section id="ordersTab" class="panel">
+      <div class="row">
+        <h2>Pedidos recebidos</h2>
+        <div class="filters">
+          <input id="orderSearch" class="search" type="search" placeholder="Buscar nome ou telefone…">
+          <select id="statusFilter" class="search">
+            <option value="open">Em aberto</option>
+            <option value="all">Todos os status</option>
+            <option value="received">Recebido</option>
+            <option value="preparing">Preparando</option>
+            <option value="out_for_delivery">Saiu para entrega</option>
+            <option value="completed">Concluído</option>
+            <option value="cancelled">Cancelado</option>
+          </select>
+          <select id="periodFilter" class="search">
+            <option value="today">Hoje</option>
+            <option value="7">Últimos 7 dias</option>
+            <option value="all">Todo o período</option>
+          </select>
+        </div>
+      </div>
+      <p class="hint">A lista atualiza sozinha a cada 20 segundos.</p>
+      <div id="orders" class="list"><div class="empty">Carregando pedidos…</div></div>
+    </section>
+
+    <!-- Disponibilidade -->
+    <section id="stockTab" class="panel hidden">
+      <div class="row">
+        <div>
+          <h2>Disponibilidade de produtos</h2>
+          <p class="muted">Desative um produto para escondê-lo como opção de compra no cardápio público.</p>
+        </div>
+        <div class="filters">
+          <input id="stockSearch" class="search" type="search" placeholder="Buscar produto…">
+          <label class="switch"><input id="onlyOff" type="checkbox"> Só indisponíveis</label>
+        </div>
+      </div>
+      <div id="stock"></div>
+    </section>
+
+    <!-- Promoções -->
+    <section id="promotionsTab" class="panel hidden">
+      <h2>Banner de promoções</h2>
+      <p class="muted">Cadastre a oferta e ela aparecerá no site sem precisar de fotos. A promoção também altera o preço do produto no cardápio e no carrinho.</p>
+      <form id="promoForm" class="panel" style="margin:14px 0;background:#141414">
+        <input id="promoId" type="hidden">
+        <h3 class="promo-form-title">CRIAR OU EDITAR PROMOÇÃO</h3>
+        <p class="promo-form-sub">Escolha o produto na lista organizada por grupos. Para combos, selecione os itens desejados.</p>
+        <div class="promo-grid">
+          <label class="field">Tipo de promoção
+            <select id="promoType" class="search"><option value="product">Produto individual</option><option value="combo">Combo promocional</option></select>
+          </label>
+          <label class="field">Texto do banner<input id="promoTitle" class="search" maxlength="70" placeholder="Ex.: COMBO DA GALERA"></label>
+        </div>
+        <div id="singleProductFields">
+          <label class="field">Produto<select id="promoProduct" class="search"></select></label>
+          <label class="field">Quantidade de unidades no pacote promocional
+            <input id="promoQuantity" class="search" type="number" min="1" max="99" step="1" value="1" required>
+            <small class="muted">Ex.: 3 unidades por R$ 15,00. O preço promocional será o total do pacote.</small>
+          </label>
+        </div>
+        <div id="comboFields" class="hidden">
+          <div class="field">
+            <label><strong>Produtos que fazem parte do combo</strong></label>
+            <input id="comboProductSearch" class="search" type="search" placeholder="Buscar pizza, burger, esfirra…">
+            <div id="comboProductGroups" class="combo-product-groups"></div>
+            <div class="row"><span id="comboSelectedCount" class="muted">0 produtos selecionados</span><button type="button" class="secondary small" id="clearComboProducts">Limpar seleção</button></div>
+          </div>
+          <p class="hint">Marque as caixas dos produtos que deseja incluir. Selecione quantos quiser.</p>
+        </div>
+        <div class="promo-grid">
+          <label class="field">Tipo de desconto
+            <select id="discountType" class="search"><option value="fixed">Preço promocional (R$)</option><option value="percent">Desconto percentual (%)</option></select>
+          </label>
+          <label class="field" id="discountValueField"><span>Valor promocional</span>
+            <input id="promoPrice" class="search" type="number" min="0.01" step="0.01" required placeholder="Ex.: 19,90">
+          </label>
+        </div>
+        <div id="discountPreview" class="notice">Selecione o produto e o desconto para calcular o preço.</div>
+        <div class="promo-grid">
+          <label class="field">Começa em (opcional)<input id="promoStart" class="search" type="datetime-local"></label>
+          <label class="field">Termina em (opcional)<input id="promoEnd" class="search" type="datetime-local"></label>
+        </div>
+        <label class="switch"><input id="promoActive" type="checkbox" checked> Promoção ativa</label>
+        <div class="row" style="margin-top:14px">
+          <button class="primary" type="submit">Salvar promoção</button>
+          <button class="secondary" type="button" id="promoCancel">Limpar formulário</button>
+        </div>
+      </form>
+      <h3>Promoções cadastradas</h3>
+      <div id="promotions" class="list"><div class="empty">Carregando promoções…</div></div>
+    </section>
+
+    <!-- Vendas -->
+    <section id="salesTab" class="panel hidden">
+      <div class="row"><h2>Relatório de vendas</h2><button id="exportCsv" class="secondary small">⬇ Exportar mês (CSV)</button></div>
+      <div class="stats">
+        <div class="stat"><small>Hoje</small><strong id="daySales">R$ 0,00</strong><span class="muted" id="dayCount">0 pedidos</span></div>
+        <div class="stat"><small>Últimos 7 dias</small><strong id="weekSales">R$ 0,00</strong><span class="muted" id="weekCount">0 pedidos</span></div>
+        <div class="stat"><small>Mês atual</small><strong id="monthSales">R$ 0,00</strong><span class="muted" id="monthCount">0 pedidos</span></div>
+        <div class="stat"><small>Ticket médio do mês</small><strong id="monthTicket">R$ 0,00</strong></div>
+      </div>
+      <div class="chart-wrap">
+        <div class="row">
+          <h3 id="chartTitle">Vendas nos últimos 7 dias</h3>
+          <select id="chartRange" class="search" style="max-width:220px"><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="12">Últimos 12 meses</option></select>
+        </div>
+        <div id="salesChart"></div>
+      </div>
+      <h3 style="margin-top:22px">Forma de pagamento — hoje</h3>
+      <div class="stats">
+        <div class="stat"><small>Pix</small><strong id="pixSales">R$ 0,00</strong></div>
+        <div class="stat"><small>Dinheiro</small><strong id="cashSales">R$ 0,00</strong></div>
+        <div class="stat"><small>Cartão</small><strong id="cardSales">R$ 0,00</strong></div>
+        <div class="stat"><small>Pedidos concluídos hoje</small><strong id="dayDoneCount">0</strong></div>
+      </div>
+      <h3>Mais vendidos no mês</h3>
+      <div id="topProducts" class="rank"></div>
+      <p class="muted" style="margin-top:16px">Os relatórios consideram somente pedidos com status “Concluído” e a data de criação do pedido. Mude o status dos pedidos quando forem concluídos para que entrem nas vendas.</p>
+    </section>
+  </section>
+</main>
+
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+<script src="js/admin.js"></script>
+</body>
+</html>

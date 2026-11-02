@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#161616">
+<title>Marquinho’s Lanches | Cardápio e Delivery</title>
+<meta name="description" content="Hambúrguer industrial e artesanal, pizzas, esfirras, batatas e bebidas. Peça pelo WhatsApp e pague no Pix. Marquinho’s Lanches, Perpétuo Socorro, Oriximiná.">
+<meta property="og:title" content="Marquinho’s Lanches | Cardápio e Delivery">
+<meta property="og:description" content="Peça pelo WhatsApp e pague no Pix.">
+<meta property="og:image" content="assets/logo.jpg">
+<link rel="icon" type="image/jpeg" href="assets/logo.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/site.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Restaurant","name":"Marquinho’s Lanches","telephone":"+5593991759806","address":{"@type":"PostalAddress","streetAddress":"Travessa Cazuza Guerreiro, 1225","addressLocality":"Oriximiná","addressRegion":"PA","addressCountry":"BR"},"servesCuisine":["Hambúrguer","Pizzas","Esfirras"]}</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="backend-config.js"></script>
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="#" aria-label="Marquinho’s Lanches - início"><b>MARQUINHO’S<br><span>LANCHES</span></b></a>
+  <div class="r"><span id="st" class="s" hidden></span><a class="wa" id="waTop" href="#" target="_blank" rel="noopener">WhatsApp</a></div>
+</header>
+
+<div class="hero">
+  <div>
+    <h1>Fome?<br>Peça no <em>Marquinho’s</em></h1>
+    <p>Industrial, artesanal, pizzas, esfirras e batatas. Peça pelo WhatsApp e pague no Pix.</p>
+    <button class="btn" data-a="go" data-k="menu">Ver cardápio</button>
+  </div>
+  <span class="lg"><img src="assets/logo.jpg" alt="Logo Marquinho’s Lanches" width="170" height="170"></span>
+</div>
+
+<section id="promoBanner" class="promo-banner" hidden aria-label="Promoções">
+  <div class="promo-head"><span>OFERTAS ESPECIAIS</span><span class="promo-star">✦</span></div>
+  <h2>PREÇOS QUE <em>VALEM A PENA</em></h2>
+  <div id="promoList" class="promo-list"></div>
+  <p class="promo-foot">Aproveite enquanto estiver disponível!</p>
+</section>
+
+<nav class="tabs" id="tabs" aria-label="Categorias"></nav>
+
+<main id="menu">
+  <label class="sr-only" for="q">Buscar no cardápio</label>
+  <input id="q" type="search" placeholder="Buscar no cardápio (ex.: bacon, calabresa)">
+  <div id="list"></div>
+</main>
+
+<div class="info"><div>
+  <section><h2>Onde estamos</h2><p>Travessa Cazuza Guerreiro, 1225<br>Perpétuo Socorro, Oriximiná, Pará</p></section>
+  <section><h2>Delivery</h2><p>Aberto todos os dias, das 19h30 às 00h<br>Taxa de entrega: R$ 5,00<br>Disk delivery: (93) 99175-9806</p></section>
+  <section><h2>Pagamento</h2><p>Pix, dinheiro ou cartão na entrega.</p></section>
+</div></div>
+<footer>Marquinho’s Lanches · Travessa Cazuza Guerreiro, 1225 · (93) 99175-9806</footer>
+
+<button class="bar" id="bar" data-a="open" hidden aria-label="Abrir carrinho"><span id="bc"></span><span>Ver carrinho · <span id="bt"></span></span></button>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<!-- Carrinho / dados do pedido -->
+<div class="dr" id="dr" hidden role="dialog" aria-modal="true" aria-label="Seu pedido"><div class="pn">
+  <div class="hd"><h2>Seu pedido</h2><button class="x" data-a="close" aria-label="Fechar">✕</button></div>
+  <p class="cart-help">Confira os itens, ajuste as quantidades e só depois envie o pedido pelo WhatsApp.</p>
+  <div id="lines"></div>
+  <p id="closedNote" class="closed-note" hidden>Estamos fechados agora. Você pode enviar o pedido e ele será atendido a partir das 19h30.</p>
+  <label>Nome<input id="nm" type="text" autocomplete="name"></label>
+  <label>Telefone (WhatsApp)<input id="ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="(93) 99999-9999"></label>
+  <fieldset><legend>Como receber?</legend>
+    <label><input type="radio" name="t" value="Entrega" checked> Entrega (+ R$ 5,00)</label>
+    <label><input type="radio" name="t" value="Retirada"> Retirar no local</label>
+  </fieldset>
+  <div id="adr">
+    <label>Endereço<input id="ad" type="text" autocomplete="street-address"></label>
+    <label>Ponto de referência<input id="rf2" type="text"></label>
+  </div>
+  <label>Pagamento
+    <select id="pay"><option>Pix</option><option>Dinheiro</option><option>Cartão na entrega</option></select>
+  </label>
+  <label>Observações do pedido (opcional)
+    <textarea id="orderobs" rows="3" maxlength="300" placeholder="Ex.: entregar no portão, tocar a campainha, algum recado para a equipe..."></textarea>
+  </label>
+  <label id="troco" hidden>Troco para<input id="tr" type="text" inputmode="decimal" placeholder="Ex.: R$ 50,00"></label>
+  <div id="pixbox" class="pix" hidden>
+    <b>Pagamento via Pix</b>
+    <p style="margin:4px 0">Copie a chave Pix abaixo e faça o pagamento no aplicativo do seu banco. Depois, envie o comprovante pelo WhatsApp.</p>
+    <p style="margin:10px 0 0">Chave Pix (CPF): <b id="pk" style="user-select:all;overflow-wrap:anywhere"></b></p>
+    <p style="margin:4px 0 0;font-size:.85rem">Recebedor: Marcus Rodrigo Gato dos Santos</p>
+    <button class="btn" data-a="ck2" style="margin-top:10px">Copiar chave Pix</button>
+  </div>
+  <div style="margin-top:14px">
+    <div class="sum"><span>Subtotal</span><span id="rs"></span></div>
+    <div class="sum"><span>Entrega</span><span id="rf"></span></div>
+    <div class="sum t"><span>Total</span><span id="rt"></span></div>
+  </div>
+  <p class="err" id="err" hidden role="alert"></p>
+  <a class="wa" id="send" target="_blank" rel="noopener">Enviar pedido no WhatsApp</a>
+</div></div>
+
+<!-- Montar combo de lanches -->
+<div class="dr" id="cbm" hidden role="dialog" aria-modal="true" aria-label="Montar combo"><div class="pn">
+  <div class="hd"><h2 id="cbt">Monte seu combo</h2><button class="x" data-a="cbx" aria-label="Fechar">✕</button></div>
+  <p id="cbd" class="hint"></p>
+  <div id="cbs"></div>
+  <p class="hint">Informe o sabor do refrigerante na observação do pedido.</p>
+  <div class="sum t"><span>Total do combo</span><span id="cbp"></span></div>
+  <button class="btn" id="cbadd" style="width:100%;margin-top:12px;min-height:52px">Adicionar combo ao pedido</button>
+</div></div>
+
+<!-- Montar pizza -->
+<div class="dr" id="pizzam" hidden role="dialog" aria-modal="true" aria-label="Montar pizza"><div class="pn">
+  <div class="hd"><h2 id="pzt">Monte sua pizza</h2><button class="x" data-a="pzc" aria-label="Fechar">✕</button></div>
+  <p class="hint">Escolha o tamanho e os sabores. O preço é calculado pela regra de mistura entre tradicional e especial.</p>
+  <label>Tamanho
+    <select id="pzs"><option value="0">Pequena</option><option value="1">Média</option><option value="2">Grande</option><option value="3">Família</option></select>
+  </label>
+  <p id="pzlimit" class="hint"></p>
+  <div id="pzflavors"></div>
+  <label>Batata (opcional)<select id="pzbat"><option value="">Sem batata</option></select></label>
+  <label>Refrigerante (opcional)<select id="pzdrink"><option value="">Sem refrigerante</option></select></label>
+  <label>Adicionais / observações
+    <textarea id="pznotes" rows="3" maxlength="300" placeholder="Ex.: borda recheada, retirar cebola, molho à parte... (eventuais valores serão confirmados)"></textarea>
+  </label>
+  <div class="sum t"><span>Total</span><span id="pztotal"></span></div>
+  <button class="btn" id="pzadd" style="width:100%;margin-top:12px;min-height:52px">Adicionar ao pedido</button>
+</div></div>
+
+<script src="js/menu-data.js"></script>
+<script src="js/site.js"></script>
+</body>
+</html>
