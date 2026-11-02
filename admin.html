@@ -48,9 +48,9 @@
     </div>
 
     <div class="stats">
-      <div class="stat"><small>Vendas concluídas hoje</small><strong id="sales">R$ 0,00</strong></div>
-      <div class="stat"><small>Pedidos concluídos hoje</small><strong id="doneCount">0</strong></div>
-      <div class="stat"><small>Pedidos em aberto</small><strong id="openCount">0</strong></div>
+      <div class="stat"><small>Vendas hoje</small><strong id="sales">R$ 0,00</strong></div>
+      <div class="stat"><small>Pedidos hoje</small><strong id="doneCount">0</strong></div>
+      <div class="stat"><small>Cancelados hoje</small><strong id="openCount">0</strong></div>
       <div class="stat"><small>Ticket médio hoje</small><strong id="ticket">R$ 0,00</strong></div>
     </div>
 
@@ -68,8 +68,8 @@
         <div class="filters">
           <input id="orderSearch" class="search" type="search" placeholder="Buscar nome ou telefone…">
           <select id="statusFilter" class="search">
+            <option value="all" selected>Todos os status</option>
             <option value="open">Em aberto</option>
-            <option value="all">Todos os status</option>
             <option value="received">Recebido</option>
             <option value="preparing">Preparando</option>
             <option value="out_for_delivery">Saiu para entrega</option>
@@ -176,11 +176,11 @@
         <div class="stat"><small>Pix</small><strong id="pixSales">R$ 0,00</strong></div>
         <div class="stat"><small>Dinheiro</small><strong id="cashSales">R$ 0,00</strong></div>
         <div class="stat"><small>Cartão</small><strong id="cardSales">R$ 0,00</strong></div>
-        <div class="stat"><small>Pedidos concluídos hoje</small><strong id="dayDoneCount">0</strong></div>
+        <div class="stat"><small>Pedidos hoje</small><strong id="dayDoneCount">0</strong></div>
       </div>
       <h3>Mais vendidos no mês</h3>
       <div id="topProducts" class="rank"></div>
-      <p class="muted" style="margin-top:16px">Os relatórios consideram somente pedidos com status “Concluído” e a data de criação do pedido. Mude o status dos pedidos quando forem concluídos para que entrem nas vendas.</p>
+      <p class="muted" style="margin-top:16px">Os relatórios contam todos os pedidos recebidos, na data em que foram feitos. Só ficam de fora os pedidos marcados como “Cancelado”. Não é preciso marcar como concluído.</p>
     </section>
   </section>
 </main>

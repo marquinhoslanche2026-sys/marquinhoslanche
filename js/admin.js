@@ -163,11 +163,13 @@ $('#soundToggle').addEventListener('change', () => {
 });
 
 /* ===== Visão geral ===== */
+/* Vendas = todo pedido que NÃO foi cancelado (não precisa marcar como concluído) */
+const isCounted = o => o.status !== 'cancelled';
 const sumTotals = xs => xs.reduce((a, o) => a + Number(o.total || 0), 0);
 function renderStats() {
   const today = dateKey(new Date());
-  const done = orders.filter(o => o.status === 'completed' && dateKey(o.created_at) === today);
-  const opened = orders.filter(o => OPEN_STATUSES.includes(o.status));
+  const done = orders.filter(o => isCounted(o) && dateKey(o.created_at) === today);
+  const opened = orders.filter(o => o.status === 'cancelled' && dateKey(o.created_at) === today);
   const sum = sumTotals(done);
   $('#sales').textContent = money(sum);
   $('#doneCount').textContent = done.length;
@@ -364,7 +366,7 @@ $('#onlyOff').onchange = renderStock;
 function renderSales() {
   const now = new Date(), today = dateKey(now);
   const weekStart = new Date(now); weekStart.setDate(now.getDate() - 6); weekStart.setHours(0, 0, 0, 0);
-  const done = orders.filter(o => o.status === 'completed');
+  const done = orders.filter(isCounted);
   const tod = done.filter(o => dateKey(o.created_at) === today);
   const week = done.filter(o => new Date(o.created_at) >= weekStart);
   const month = monthOrders(done);
@@ -398,11 +400,11 @@ function renderTopProducts(month) {
   const max = Math.max(1, ...rows.map(r => r[1].qty));
   $('#topProducts').innerHTML = rows.length
     ? rows.map(([name, v], i) => `<div class="rank-row"><b>${i + 1}º</b><div>${esc(name)}<div class="rank-bar"><i style="width:${(v.qty / max * 100).toFixed(0)}%"></i></div></div><div style="text-align:right"><b>${v.qty}×</b><div class="meta" style="margin:0">${money(v.total)}</div></div></div>`).join('')
-    : '<div class="empty">Ainda não há pedidos concluídos neste mês.</div>';
+    : '<div class="empty">Ainda não há pedidos neste mês.</div>';
 }
 function renderSalesChart() {
   const range = $('#chartRange').value || '7', now = new Date(), rows = [];
-  const doneOrders = orders.filter(o => o.status === 'completed');
+  const doneOrders = orders.filter(isCounted);
   if (range === '12') {
     for (let i = 11; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -420,7 +422,7 @@ function renderSalesChart() {
   $('#chartTitle').textContent = range === '12' ? 'Vendas por mês — últimos 12 meses' : `Vendas por dia — últimos ${range} dias`;
   const W = 900, H = 300, pad = { l: 48, r: 14, t: 25, b: 45 }, cw = W - pad.l - pad.r, ch = H - pad.t - pad.b;
   const max = Math.max(1, ...rows.map(r => r.value)), step = cw / rows.length, bw = Math.min(34, step * .62);
-  let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de vendas concluídas"><line x1="${pad.l}" y1="${pad.t + ch}" x2="${W - pad.r}" y2="${pad.t + ch}" stroke="#555"/>`;
+  let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de vendas"><line x1="${pad.l}" y1="${pad.t + ch}" x2="${W - pad.r}" y2="${pad.t + ch}" stroke="#555"/>`;
   for (let i = 0; i <= 4; i++) {
     const y = pad.t + ch - ch * i / 4, v = max * i / 4;
     svg += `<line x1="${pad.l}" y1="${y}" x2="${W - pad.r}" y2="${y}" stroke="#ffffff14"/><text x="${pad.l - 8}" y="${y + 4}" text-anchor="end" class="chart-label">${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v)}</text>`;
@@ -434,8 +436,8 @@ function renderSalesChart() {
 }
 $('#chartRange').onchange = renderSalesChart;
 $('#exportCsv').onclick = () => {
-  const month = monthOrders(orders.filter(o => o.status === 'completed')).reverse();
-  if (!month.length) { say('Não há pedidos concluídos neste mês para exportar.', true); return; }
+  const month = monthOrders(orders.filter(isCounted)).reverse();
+  if (!month.length) { say('Não há pedidos neste mês para exportar.', true); return; }
   const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [['Data', 'Pedido', 'Cliente', 'Telefone', 'Tipo', 'Pagamento', 'Subtotal', 'Entrega', 'Total', 'Itens'].map(cell).join(';')];
   month.forEach(o => lines.push([new Date(o.created_at).toLocaleString('pt-BR'), o.id.slice(0, 8), o.customer_name, o.customer_phone, o.fulfillment === 'delivery' ? 'Entrega' : 'Retirada', o.payment_method,
