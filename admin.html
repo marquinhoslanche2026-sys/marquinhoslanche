@@ -78,12 +78,22 @@
           </select>
           <select id="periodFilter" class="search">
             <option value="today">Hoje</option>
+            <option value="yesterday">Ontem</option>
             <option value="7">Últimos 7 dias</option>
+            <option value="month">Este mês</option>
             <option value="all">Todo o período</option>
+            <option value="date">Data específica</option>
+            <option value="range">Intervalo de datas</option>
           </select>
+          <span id="orderDateWrap" class="hidden"><input id="orderDate" class="search" type="date" aria-label="Data"></span>
+          <span id="orderRangeWrap" class="hidden"><input id="orderFrom" class="search" type="date" aria-label="De"> <input id="orderTo" class="search" type="date" aria-label="Até"></span>
         </div>
       </div>
       <p class="hint">A lista atualiza sozinha a cada 20 segundos.</p>
+      <div class="row" style="margin:8px 0">
+        <div id="ordersSummary" class="muted"></div>
+        <button id="exportOrders" class="secondary small" title="Baixa os pedidos que estão aparecendo na lista (respeita período, status e busca)">⬇ Exportar lista (CSV)</button>
+      </div>
       <div id="orders" class="list"><div class="empty">Carregando pedidos…</div></div>
     </section>
 
@@ -157,7 +167,7 @@
 
     <!-- Vendas -->
     <section id="salesTab" class="panel hidden">
-      <div class="row"><h2>Relatório de vendas</h2><button id="exportCsv" class="secondary small">⬇ Exportar mês (CSV)</button></div>
+      <div class="row"><h2>Relatório de vendas</h2></div>
       <div class="stats">
         <div class="stat"><small>Hoje</small><strong id="daySales">R$ 0,00</strong><span class="muted" id="dayCount">0 pedidos</span></div>
         <div class="stat"><small>Últimos 7 dias</small><strong id="weekSales">R$ 0,00</strong><span class="muted" id="weekCount">0 pedidos</span></div>
@@ -171,16 +181,42 @@
         </div>
         <div id="salesChart"></div>
       </div>
-      <h3 style="margin-top:22px">Forma de pagamento — hoje</h3>
-      <div class="stats">
-        <div class="stat"><small>Pix</small><strong id="pixSales">R$ 0,00</strong></div>
-        <div class="stat"><small>Dinheiro</small><strong id="cashSales">R$ 0,00</strong></div>
-        <div class="stat"><small>Cartão</small><strong id="cardSales">R$ 0,00</strong></div>
-        <div class="stat"><small>Pedidos hoje</small><strong id="dayDoneCount">0</strong></div>
+      <div class="panel" style="margin-top:22px;background:#141414">
+        <div class="row">
+          <h3 style="margin:0">Consultar por período</h3>
+          <div class="filters">
+            <select id="salesPeriod" class="search">
+            <option value="today">Hoje</option>
+            <option value="yesterday">Ontem</option>
+            <option value="7">Últimos 7 dias</option>
+            <option value="month">Este mês</option>
+            <option value="all">Todo o período</option>
+            <option value="date">Data específica</option>
+            <option value="range">Intervalo de datas</option>
+          </select>
+          <span id="salesDateWrap" class="hidden"><input id="salesDate" class="search" type="date" aria-label="Data"></span>
+          <span id="salesRangeWrap" class="hidden"><input id="salesFrom" class="search" type="date" aria-label="De"> <input id="salesTo" class="search" type="date" aria-label="Até"></span>
+            <button id="exportCsv" class="secondary small">⬇ Exportar período (CSV)</button>
+          </div>
+        </div>
+        <p id="salesPeriodHint" class="hint"></p>
+        <div class="stats">
+          <div class="stat"><small>Total vendido</small><strong id="psTotal">R$ 0,00</strong></div>
+          <div class="stat"><small>Pedidos</small><strong id="psCount">0</strong></div>
+          <div class="stat"><small>Ticket médio</small><strong id="psTicket">R$ 0,00</strong></div>
+          <div class="stat"><small>Cancelados</small><strong id="psCancelled">0</strong></div>
+        </div>
+        <h3 id="payTitle" style="margin-top:22px">Forma de pagamento</h3>
+        <div class="stats">
+          <div class="stat"><small>Pix</small><strong id="pixSales">R$ 0,00</strong></div>
+          <div class="stat"><small>Dinheiro</small><strong id="cashSales">R$ 0,00</strong></div>
+          <div class="stat"><small>Cartão</small><strong id="cardSales">R$ 0,00</strong></div>
+          <div class="stat"><small>Outros</small><strong id="otherSales">R$ 0,00</strong></div>
+        </div>
+        <h3 id="topTitle">Mais vendidos</h3>
+        <div id="topProducts" class="rank"></div>
       </div>
-      <h3>Mais vendidos no mês</h3>
-      <div id="topProducts" class="rank"></div>
-      <p class="muted" style="margin-top:16px">Os relatórios contam todos os pedidos recebidos, na data em que foram feitos. Só ficam de fora os pedidos marcados como “Cancelado”. Não é preciso marcar como concluído.</p>
+      <p class="muted" style="margin-top:16px">Os relatórios contam todos os pedidos recebidos, na data em que foram feitos, no horário local. Só ficam de fora os pedidos marcados como “Cancelado”. Não é preciso marcar como concluído.</p>
     </section>
   </section>
 </main>
