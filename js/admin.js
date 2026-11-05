@@ -18,6 +18,7 @@ const POLL_MS = 20000;
 
 let db = null, orders = [], products = [], promotions = [];
 let selectedComboKeySet = new Set();
+let fullHistory = false;
 let knownOrderIds = null, pollTimer = null, newOrderIds = new Set(), booted = false;
 
 if (ready) db = window.supabase.createClient(cfg.url, cfg.anonKey);
@@ -69,7 +70,7 @@ async function boot() {
 
 /* ===== Carregamento de dados ===== */
 /* Carrega pedidos paginados (o Supabase devolve no máx. 1000 por consulta).
-   full=true  -> últimos 12 meses (relatórios corretos)
+   full=true  -> últimos 12 meses (ou o histórico inteiro, se o usuário pediu "Todo o período"/data antiga)
    full=false -> só os últimos 2 dias (atualização leve a cada 20 s) e mescla com o que já está na tela */
 async function fetchOrdersSince(sinceISO) {
   const all = [], PAGE = 1000;
@@ -86,7 +87,7 @@ async function loadOrders(full = false) {
   try {
     const now = new Date();
     const since = full || !orders.length
-      ? new Date(now.getFullYear(), now.getMonth() - 11, 1)
+      ? (fullHistory ? new Date(2000, 0, 1) : new Date(now.getFullYear(), now.getMonth() - 11, 1))
       : new Date(Date.now() - 2 * 864e5);
     const fresh = await fetchOrdersSince(since.toISOString());
     const older = full || !orders.length ? [] : orders.filter(o => new Date(o.created_at) < since);
@@ -178,6 +179,69 @@ function renderStats() {
   updateBadge();
 }
 
+/* ===== Períodos (hoje, ontem, 7 dias, mês, todo o período, data específica, intervalo) ===== */
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const fmtDate = k => String(k).split('-').reverse().join('/');
+function periodRange(kind, date, from, to) {
+  const now = new Date(), t = dateKey(now);
+  if (kind === 'today') return { kind, from: t, to: t, label: 'hoje' };
+  if (kind === 'yesterday') { const y = dateKey(addDays(now, -1)); return { kind, from: y, to: y, label: 'ontem' }; }
+  if (kind === '7') return { kind, from: dateKey(addDays(now, -6)), to: t, label: 'últimos 7 dias' };
+  if (kind === 'month') return { kind, from: dateKey(new Date(now.getFullYear(), now.getMonth(), 1)), to: dateKey(new Date(now.getFullYear(), now.getMonth() + 1, 0)), label: 'este mês' };
+  if (kind === 'date') return date ? { kind, from: date, to: date, label: fmtDate(date) } : { kind, pending: true, label: 'data específica' };
+  if (kind === 'range') {
+    if (!from && !to) return { kind, pending: true, label: 'intervalo' };
+    if (from && to && from > to) [from, to] = [to, from];
+    return { kind, from: from || null, to: to || null, label: from && to ? `${fmtDate(from)} a ${fmtDate(to)}` : from ? `desde ${fmtDate(from)}` : `até ${fmtDate(to)}` };
+  }
+  return { kind: 'all', from: null, to: null, label: 'todo o período' };
+}
+function inPeriod(o, p) {
+  if (p.pending) return false;
+  const k = dateKey(o.created_at);
+  return (!p.from || k >= p.from) && (!p.to || k <= p.to);
+}
+const periodSlug = p => p.from && p.to ? (p.from === p.to ? p.from : `${p.from}_a_${p.to}`) : p.from ? `desde-${p.from}` : p.to ? `ate-${p.to}` : 'todo-periodo';
+/* Os pedidos ficam em memória (12 meses). Se o período pedir algo mais antigo, busca o histórico inteiro uma vez. */
+async function ensureHistory(p) {
+  if (fullHistory || p.pending) return;
+  const now = new Date();
+  const limit = dateKey(new Date(now.getFullYear(), now.getMonth() - 11, 1));
+  if (p.from && p.from >= limit) return;
+  say('Carregando histórico completo…');
+  fullHistory = true;
+  if (await loadOrders(true)) detectNewOrders(false); else fullHistory = false;
+}
+const PERIOD_ORDERS = { sel: '#periodFilter', date: '#orderDate', from: '#orderFrom', to: '#orderTo', dateWrap: '#orderDateWrap', rangeWrap: '#orderRangeWrap' };
+const PERIOD_SALES = { sel: '#salesPeriod', date: '#salesDate', from: '#salesFrom', to: '#salesTo', dateWrap: '#salesDateWrap', rangeWrap: '#salesRangeWrap' };
+const readPeriod = c => periodRange($(c.sel).value, $(c.date).value, $(c.from).value, $(c.to).value);
+const ordersPeriod = () => readPeriod(PERIOD_ORDERS), salesPeriod = () => readPeriod(PERIOD_SALES);
+function wirePeriod(c, render) {
+  const handler = async () => {
+    const k = $(c.sel).value, t = dateKey(new Date());
+    [c.date, c.from, c.to].forEach(x => { $(x).max = t; });
+    $(c.dateWrap).classList.toggle('hidden', k !== 'date');
+    $(c.rangeWrap).classList.toggle('hidden', k !== 'range');
+    await ensureHistory(readPeriod(c));
+    render();
+  };
+  [c.sel, c.date, c.from, c.to].forEach(x => $(x).addEventListener('change', handler));
+  handler();
+}
+function downloadOrdersCsv(list, filename) {
+  const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = [['Data', 'Pedido', 'Cliente', 'Telefone', 'Tipo', 'Status', 'Pagamento', 'Subtotal', 'Entrega', 'Total', 'Itens'].map(cell).join(';')];
+  [...list].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).forEach(o => lines.push([new Date(o.created_at).toLocaleString('pt-BR'), o.id.slice(0, 8), o.customer_name, o.customer_phone, o.fulfillment === 'delivery' ? 'Entrega' : 'Retirada', statusNames[o.status] || o.status, o.payment_method,
+    String(o.subtotal ?? '').replace('.', ','), String(o.delivery_fee ?? '').replace('.', ','), String(o.total ?? '').replace('.', ','),
+    (o.items || []).map(i => `${i.quantity}x ${i.name}`).join(' | ')].map(cell).join(';')));
+  const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
 /* ===== Pedidos ===== */
 const NEXT_STEP = {
   received: () => ({ to: 'preparing', label: '▶ Iniciar preparo' }),
@@ -197,12 +261,11 @@ function waLink(o) {
   return `https://wa.me/${d}?text=${encodeURIComponent(msgs[o.status] || '')}`;
 }
 function filteredOrders() {
-  const f = $('#statusFilter').value, p = $('#periodFilter').value, q = $('#orderSearch').value.trim().toLowerCase();
-  const limit = p === '7' ? Date.now() - 7 * 864e5 : null, today = dateKey(new Date());
+  const f = $('#statusFilter').value, q = $('#orderSearch').value.trim().toLowerCase(), p = ordersPeriod();
+  if (p.pending) return [];
   return orders.filter(o => {
     if (f === 'open' ? !OPEN_STATUSES.includes(o.status) : (f !== 'all' && o.status !== f)) return false;
-    if (p === 'today' && dateKey(o.created_at) !== today && !(f === 'open' && OPEN_STATUSES.includes(o.status))) return false;
-    if (limit && new Date(o.created_at).getTime() < limit) return false;
+    if (!inPeriod(o, p) && !(p.kind === 'today' && f === 'open' && OPEN_STATUSES.includes(o.status))) return false;
     if (q && !(String(o.customer_name).toLowerCase().includes(q) || String(o.customer_phone).includes(q))) return false;
     return true;
   });
@@ -226,10 +289,12 @@ function orderCard(o) {
     </div></div></article>`;
 }
 function renderOrders() {
-  const all = filteredOrders(), items = all.slice(0, 200);
+  const all = filteredOrders(), items = all.slice(0, 200), p = ordersPeriod();
+  const counted = all.filter(isCounted);
+  $('#ordersSummary').textContent = p.pending ? '' : `${all.length} ${all.length === 1 ? 'pedido' : 'pedidos'} · vendas: ${money(sumTotals(counted))} (sem cancelados) · ${p.label}`;
   $('#orders').innerHTML = items.length
-    ? items.map(orderCard).join('') + (all.length > items.length ? `<div class="empty">Mostrando os ${items.length} mais recentes de ${all.length}. Use a busca ou os filtros para ver os demais.</div>` : '')
-    : '<div class="empty">Nenhum pedido encontrado com esses filtros.</div>';
+    ? items.map(orderCard).join('') + (all.length > items.length ? `<div class="empty">Mostrando os ${items.length} mais recentes de ${all.length}. Use a busca ou os filtros para ver os demais. A exportação em CSV leva todos.</div>` : '')
+    : `<div class="empty">${p.pending ? 'Escolha a data (ou o intervalo) acima.' : 'Nenhum pedido encontrado com esses filtros.'}</div>`;
 }
 async function setStatus(id, status) {
   const { error } = await db.from('orders').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
@@ -273,8 +338,14 @@ $('#orders').addEventListener('click', async e => {
   say('Pedido excluído e exclusão registrada no histórico.');
   await refreshAll();
 });
-['statusFilter', 'periodFilter'].forEach(id => $('#' + id).addEventListener('change', renderOrders));
+$('#statusFilter').addEventListener('change', renderOrders);
 $('#orderSearch').addEventListener('input', renderOrders);
+wirePeriod(PERIOD_ORDERS, renderOrders);
+$('#exportOrders').onclick = () => {
+  const list = filteredOrders();
+  if (!list.length) { say('Não há pedidos na lista para exportar.', true); return; }
+  downloadOrdersCsv(list, `pedidos-${periodSlug(ordersPeriod())}.csv`);
+};
 
 /* ===== Disponibilidade do cardápio ===== */
 function categoryName(cat) {
@@ -377,12 +448,27 @@ function renderSales() {
   $('#weekCount').textContent = `${week.length} pedidos`;
   $('#monthCount').textContent = `${month.length} pedidos`;
   $('#monthTicket').textContent = money(month.length ? sumTotals(month) / month.length : 0);
-  $('#dayDoneCount').textContent = tod.length;
-  $('#pixSales').textContent = money(sumTotals(tod.filter(o => o.payment_method === 'Pix')));
-  $('#cashSales').textContent = money(sumTotals(tod.filter(o => o.payment_method === 'Dinheiro')));
-  $('#cardSales').textContent = money(sumTotals(tod.filter(o => String(o.payment_method).toLowerCase().includes('cartão'))));
   renderSalesChart();
-  renderTopProducts(month);
+  renderPeriodSales();
+}
+function renderPeriodSales() {
+  const p = salesPeriod();
+  const list = p.pending ? [] : orders.filter(o => inPeriod(o, p));
+  const done = list.filter(isCounted), total = sumTotals(done);
+  const by = fn => sumTotals(done.filter(fn));
+  const pix = by(o => o.payment_method === 'Pix'), cash = by(o => o.payment_method === 'Dinheiro'), card = by(o => String(o.payment_method).toLowerCase().includes('cartão'));
+  $('#salesPeriodHint').textContent = p.pending ? 'Escolha a data (ou o intervalo) para consultar.' : `Mostrando: ${p.label}`;
+  $('#psTotal').textContent = money(total);
+  $('#psCount').textContent = done.length;
+  $('#psTicket').textContent = money(done.length ? total / done.length : 0);
+  $('#psCancelled').textContent = list.length - done.length;
+  $('#pixSales').textContent = money(pix);
+  $('#cashSales').textContent = money(cash);
+  $('#cardSales').textContent = money(card);
+  $('#otherSales').textContent = money(Math.max(0, Math.round((total - pix - cash - card) * 100) / 100));
+  $('#payTitle').textContent = 'Forma de pagamento — ' + p.label;
+  $('#topTitle').textContent = 'Mais vendidos — ' + p.label;
+  renderTopProducts(done);
 }
 function monthOrders(list) {
   const now = new Date();
@@ -400,7 +486,7 @@ function renderTopProducts(month) {
   const max = Math.max(1, ...rows.map(r => r[1].qty));
   $('#topProducts').innerHTML = rows.length
     ? rows.map(([name, v], i) => `<div class="rank-row"><b>${i + 1}º</b><div>${esc(name)}<div class="rank-bar"><i style="width:${(v.qty / max * 100).toFixed(0)}%"></i></div></div><div style="text-align:right"><b>${v.qty}×</b><div class="meta" style="margin:0">${money(v.total)}</div></div></div>`).join('')
-    : '<div class="empty">Ainda não há pedidos neste mês.</div>';
+    : '<div class="empty">Não há pedidos neste período.</div>';
 }
 function renderSalesChart() {
   const range = $('#chartRange').value || '7', now = new Date(), rows = [];
@@ -435,20 +521,14 @@ function renderSalesChart() {
   $('#salesChart').innerHTML = svg + '</svg>';
 }
 $('#chartRange').onchange = renderSalesChart;
-$('#exportCsv').onclick = () => {
-  const month = monthOrders(orders.filter(isCounted)).reverse();
-  if (!month.length) { say('Não há pedidos neste mês para exportar.', true); return; }
-  const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [['Data', 'Pedido', 'Cliente', 'Telefone', 'Tipo', 'Pagamento', 'Subtotal', 'Entrega', 'Total', 'Itens'].map(cell).join(';')];
-  month.forEach(o => lines.push([new Date(o.created_at).toLocaleString('pt-BR'), o.id.slice(0, 8), o.customer_name, o.customer_phone, o.fulfillment === 'delivery' ? 'Entrega' : 'Retirada', o.payment_method,
-    String(o.subtotal ?? '').replace('.', ','), String(o.delivery_fee ?? '').replace('.', ','), String(o.total ?? '').replace('.', ','),
-    (o.items || []).map(i => `${i.quantity}x ${i.name}`).join(' | ')].map(cell).join(';')));
-  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `vendas-${dateKey(new Date()).slice(0, 7)}.csv`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+wirePeriod(PERIOD_SALES, renderSales);
+$('#exportCsv').onclick = async () => {
+  const p = salesPeriod();
+  if (p.pending) { say('Escolha a data ou o intervalo antes de exportar.', true); return; }
+  await ensureHistory(p);
+  const list = orders.filter(o => isCounted(o) && inPeriod(o, p));
+  if (!list.length) { say('Não há pedidos neste período para exportar.', true); return; }
+  downloadOrdersCsv(list, `vendas-${periodSlug(p)}.csv`);
 };
 
 /* ===== Promoções ===== */
