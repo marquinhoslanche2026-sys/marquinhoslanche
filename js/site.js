@@ -39,12 +39,20 @@ let availability = {};
 let promotions = [];
 
 /* ===== Lista plana de produtos (chave => item) ===== */
+/* Nome completo (carrinho, WhatsApp e painel): "Esfirra sabor X", "X-Burguer (Industrial)"... */
+const fname = x => x.fn || x.n;
+function fullName(ci, n) {
+  const cat = MENU[ci].n;
+  if (cat === "Esfirras") return `Esfirra sabor ${n.replace(/^de\s+/i, "")}`;
+  if (/^Hamb/.test(cat)) { const t = cat.split(" ")[1]; return new RegExp(t, "i").test(n) ? n : `${n} (${t})`; }
+  return n;
+}
 const flat = [];
 MENU.forEach((c, ci) => c.i.forEach((x, ii) => {
   if (Array.isArray(x[2])) {
     x[2].forEach((p, s) => flat.push({ k: `${ci}-${ii}-${s}`, ci, n: `Pizza ${x[0]} (${SIZE_NAMES[s]})`, d: x[1], p }));
   } else {
-    flat.push({ k: `${ci}-${ii}`, ci, n: x[0], d: x[1], p: x[2] });
+    flat.push({ k: `${ci}-${ii}`, ci, n: x[0], fn: fullName(ci, x[0]), d: x[1], p: x[2] });
   }
 }));
 const catIndex = name => MENU.findIndex(c => c.n === name);
@@ -126,7 +134,7 @@ async function syncAvailability() {
 function comboNames(o) {
   return (o.combo_items || []).map(i => {
     const p = flat.find(x => x.k === entryKey(i));
-    return p ? `${entryQty(i)}× ${p.n}` : null;
+    return p ? `${entryQty(i)}× ${fname(p)}` : null;
   }).filter(Boolean);
 }
 function renderPromotions() {
@@ -138,7 +146,7 @@ function renderPromotions() {
   list.innerHTML = valid.map(o => {
     const combo = o.promo_type === "combo";
     const name = combo ? (o.title || "COMBO PROMOCIONAL") : (o.title && o.title !== "OFERTA ESPECIAL" ? o.title : o.item.n);
-    const desc = combo ? o.names.join(" + ") : o.item.n;
+    const desc = combo ? o.names.join(" + ") : fname(o.item);
     const old = combo
       ? o.combo_items.reduce((sum, it) => { const p = flat.find(x => x.k === entryKey(it)); return sum + (p ? p.p * entryQty(it) : 0); }, 0)
       : o.item.p * offerQuantity(o);
@@ -149,7 +157,7 @@ function renderPromotions() {
 
 /* ===== Cardápio ===== */
 const qtyControl = k => cart[k]
-  ? `<div class="st2"><button data-a="m" data-k="${k}" aria-label="Diminuir quantidade de ${esc(by(k).n)}">−</button><span aria-label="Quantidade">${cart[k]}</span><button data-a="p" data-k="${k}" aria-label="Aumentar quantidade de ${esc(by(k).n)}">+</button></div>`
+  ? `<div class="st2"><button data-a="m" data-k="${k}" aria-label="Diminuir quantidade de ${esc(fname(by(k)))}">−</button><span aria-label="Quantidade">${cart[k]}</span><button data-a="p" data-k="${k}" aria-label="Aumentar quantidade de ${esc(fname(by(k)))}">+</button></div>`
   : `<button class="add" data-a="p" data-k="${k}">Adicionar</button>`;
 
 function productCard(x) {
@@ -187,7 +195,7 @@ function renderMenu() {
 const pick = (cats, re) => flat.filter(x => isAvailable(x.k) && cats.includes(MENU[x.ci].n) && (!re || re.test(x.n)));
 const lanches = () => pick(["Hambúrguer Industrial", "Hambúrguer Artesanal"]);
 const acomp = () => pick(["Acompanhamentos"]);
-const label = x => x.n + (/^Hamb/.test(MENU[x.ci].n) ? ` (${MENU[x.ci].n.split(" ")[1]})` : "");
+const label = x => fname(x);
 
 /* Para dar desconto num combo, altere "off" (valor em R$) */
 const COMBOS = {
@@ -296,17 +304,17 @@ function openPizza(size, comboId = null) {
 function cartLines() {
   return Object.keys(cart).map(k => {
     const x = by(k);
-    return `<div class="ln"><div class="lnhead"><div><b>${esc(x.n)}</b>${combos[k] ? `<small>${esc(x.d)}</small>` : ""}<span>${R(lineTotal(k))}</span></div>
-      <button class="rmitem" data-a="rm" data-k="${k}" aria-label="Remover ${esc(x.n)} do carrinho" title="Remover item">✕</button></div>
+    return `<div class="ln"><div class="lnhead"><div><b>${esc(fname(x))}</b>${combos[k] ? `<small>${esc(x.d)}</small>` : ""}<span>${R(lineTotal(k))}</span></div>
+      <button class="rmitem" data-a="rm" data-k="${k}" aria-label="Remover ${esc(fname(x))} do carrinho" title="Remover item">✕</button></div>
       ${qtyControl(k)}
-      <input data-note="${k}" value="${esc(notes[k] || "")}" placeholder="Observação (ex.: sem tomate)" maxlength="80" aria-label="Observação de ${esc(x.n)}"></div>`;
+      <input data-note="${k}" value="${esc(notes[k] || "")}" placeholder="Observação (ex.: sem tomate)" maxlength="80" aria-label="Observação de ${esc(fname(x))}"></div>`;
   }).join("");
 }
 function buildWhatsAppLink() {
   const delivery = isDelivery(), pay = $("#pay").value, ref = $("#rf2").value.trim(), obs = $("#orderobs").value.trim();
   const lines = Object.keys(cart).map(k => {
     const x = by(k);
-    return `${cart[k]}x ${x.n} - ${R(lineTotal(k))}` + (combos[k] ? ` (${combos[k].d})` : "") + (notes[k] ? `\n   _Obs: ${notes[k]}_` : "");
+    return `${cart[k]}x ${fname(x)} - ${R(lineTotal(k))}` + (combos[k] ? ` (${combos[k].d})` : "") + (notes[k] ? `\n   _Obs: ${notes[k]}_` : "");
   });
   let m = `*Novo pedido – ${CFG.name}*\n\n${lines.join("\n")}\n\nSubtotal: ${R(subtotal())}\n${delivery ? "Entrega: " + R(CFG.fee) : "Retirada no local"}\n*Total: ${R(grandTotal())}*\n\n*Cliente:* ${$("#nm").value.trim()}\n*Telefone:* ${$("#ph").value.trim()}\n`;
   if (delivery) m += `*Entrega em:* ${$("#ad").value.trim()}${ref ? " (ref.: " + ref + ")" : ""}\n`;
@@ -445,7 +453,7 @@ $("#pzadd").addEventListener("click", () => {
     if (!d.bat) { showToast(`Escolha a batata do combo (${c.batName}).`); return; }
   }
   const obs = $("#pznotes").value.trim();
-  const detail = `${SIZE_NAMES[pzSize]} · ${d.chosen.map(x => x.name).join(" / ")}${d.bat ? " · " + d.bat.n : ""}${d.drink ? " · " + d.drink.n : ""}${obs ? " · Obs.: " + obs : ""}`;
+  const detail = `${pzCombo ? SIZE_NAMES[pzSize] + " · " : ""}${d.chosen.length > 1 ? "Sabores" : "Sabor"}: ${d.chosen.map(x => x.name).join(" / ")}${d.bat ? " · " + d.bat.n : ""}${d.drink ? " · " + d.drink.n : ""}${obs ? " · Obs.: " + obs : ""}`;
   const id = "pz" + Date.now();
   combos[id] = { n: pzCombo ? PIZZA_COMBOS.find(x => x.id === pzCombo).n : `Pizza ${SIZE_NAMES[pzSize]}`, d: detail, p: d.price };
   cart[id] = 1; pzCombo = null;
@@ -484,7 +492,7 @@ $("#send").addEventListener("click", async e => {
   if (win) win.document.write("<title>Registrando pedido…</title><p style='font:16px sans-serif;padding:24px'>Registrando seu pedido…</p>");
   const items = Object.keys(cart).map(k => {
     const p = by(k);
-    return { product_key: k, name: p.n, quantity: cart[k], unit_price: p.p, line_total: lineTotal(k), details: combos[k]?.d || null, notes: notes[k] || null };
+    return { product_key: k, name: fname(p), quantity: cart[k], unit_price: p.p, line_total: lineTotal(k), details: combos[k]?.d || null, notes: notes[k] || null };
   });
   try {
     const delivery = isDelivery();
