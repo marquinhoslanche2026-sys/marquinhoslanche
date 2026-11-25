@@ -89,6 +89,8 @@
           <span id="orderRangeWrap" class="hidden"><input id="orderFrom" class="search" type="date" aria-label="De"> <input id="orderTo" class="search" type="date" aria-label="Até"></span>
         </div>
       </div>
+      <label class="switch" style="margin:8px 0 2px" title="Desligue se você não consegue acompanhar cada etapa do pedido"><input id="trackStatus" type="checkbox" checked> <b>Controlar status dos pedidos</b> <span class="muted">(preparando, saiu para entrega, concluído)</span></label>
+      <p id="trackHint" class="hint"></p>
       <p class="hint">A lista atualiza sozinha a cada 20 segundos.</p>
       <div class="row" style="margin:8px 0">
         <div id="ordersSummary" class="muted"></div>
@@ -116,6 +118,15 @@
     <section id="promotionsTab" class="panel hidden">
       <h2>Banner de promoções</h2>
       <p class="muted">Cadastre a oferta e ela aparecerá no site sem precisar de fotos. A promoção também altera o preço do produto no cardápio e no carrinho.</p>
+      <form id="autoPromoForm" class="panel" style="margin:14px 0;background:#141414">
+        <h3 class="promo-form-title">PROMOÇÃO AUTOMÁTICA</h3>
+        <p class="promo-form-sub">Escolha só a porcentagem. O painel aplica o desconto em todos os produtos das categorias marcadas, com o preço já arredondado. Promoções que você criar manualmente para um produto têm prioridade.</p>
+        <label class="switch"><input id="autoActive" type="checkbox"> Promoção automática ligada</label>
+        <label class="field" style="max-width:240px">Desconto (%)<input id="autoPercent" class="search" type="number" min="1" max="99" step="1" value="10" required></label>
+        <div class="field"><label><strong>Categorias que entram na promoção</strong></label><div id="autoCats" class="filters" style="gap:8px 18px"></div></div>
+        <p id="autoStatus" class="hint"></p>
+        <button class="primary" type="submit">Salvar e aplicar</button>
+      </form>
       <form id="promoForm" class="panel" style="margin:14px 0;background:#141414">
         <input id="promoId" type="hidden">
         <h3 class="promo-form-title">CRIAR OU EDITAR PROMOÇÃO</h3>
