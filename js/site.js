@@ -24,13 +24,13 @@ const NAV_LABELS = {
 
 /* Título usado pelo painel nas promoções automáticas (não altere) */
 const AUTO_TITLE = "PROMOÇÃO AUTOMÁTICA";
-/* "Mais pedidos": edite aqui os itens que mais vendem — formato [categoria, nome do item] */
+/* "Mais pedidos" é configurado no painel (aba "Mais pedidos"). Esta lista só é usada se o site não conseguir ler essa configuração. Formato [categoria, nome do item] */
 const FAVORITES = [
   ["Hambúrguer Industrial", "X-Salada"],
   ["Hambúrguer Industrial", "X-Bacon"],
+  ["Hambúrguer Industrial", "X-Tudo"],
   ["Hambúrguer Artesanal", "Picanha Barbecue"],
-  ["Acompanhamentos", "Batata Especial"],
-  ["Bebidas", "Refrigerante 2 litros"]
+  ["Hambúrguer Artesanal", "X-Bacon Artesanal"]
 ];
 /* Sugestões mostradas no carrinho quando o cliente ainda não escolheu bebida / acompanhamento */
 const UPSELL_DRINKS = [["Bebidas", "Refrigerante lata"], ["Bebidas", "Suco natural 400 ml"], ["Bebidas", "Refrigerante 2 litros"]];
@@ -71,6 +71,9 @@ MENU.forEach((c, ci) => c.i.forEach((x, ii) => {
 }));
 const catIndex = name => MENU.findIndex(c => c.n === name);
 const findItem = ([cat, name]) => flat.find(x => MENU[x.ci].n === cat && x.n === name);
+const fallbackFavs = () => FAVORITES.map(findItem).filter(Boolean).map(x => x.k);
+let favKeys = db ? null : fallbackFavs();   // null = ainda carregando
+const favItems = () => (favKeys || []).map(k => flat.find(x => x.k === k)).filter(x => x && x.k.split("-").length < 3 && isAvailable(x.k));
 const isAvailable = k => availability[k] !== false;
 
 /* ===== Estado do carrinho ===== */
@@ -129,11 +132,13 @@ function isOpenNow() {
 async function syncAvailability() {
   if (!db) return;
   try {
-    const [pr, of] = await Promise.all([
+    const [pr, of, fv] = await Promise.all([
       db.from("products").select("product_key,available"),
-      db.from("promotions").select("id,title,product_key,promo_price,discount_percent,promo_type,combo_items,active,starts_at,ends_at").eq("active", true)
+      db.from("promotions").select("id,title,product_key,promo_price,discount_percent,promo_type,combo_items,active,starts_at,ends_at").eq("active", true),
+      db.from("site_settings").select("value").eq("key", "favorites").maybeSingle()
     ]);
     if (pr.error) throw pr.error;
+    favKeys = fv.error ? fallbackFavs() : (Array.isArray(fv.data?.value) ? fv.data.value.map(String) : []);
     availability = Object.fromEntries((pr.data || []).map(p => [p.product_key, p.available]));
     const now = Date.now();
     promotions = (of.error ? [] : (of.data || [])).filter(o =>
@@ -143,10 +148,12 @@ async function syncAvailability() {
         ? (o.combo_items || []).every(i => availability[entryKey(i)] !== false)   // combo some se algum item acabou
         : availability[o.product_key] !== false));
     renderPromotions();
+    renderTabs();
     renderMenu();
     renderCart();
   } catch (e) {
     console.warn("Sincronização remota indisponível:", e.message);
+    if (favKeys === null) { favKeys = fallbackFavs(); renderTabs(); renderMenu(); }
   }
 }
 
@@ -158,11 +165,19 @@ function comboNames(o) {
 }
 function autoBannerHtml(auto) {
   if (!auto.length) return "";
-  const pct = Math.max(...auto.map(o => Number(o.discount_percent) || 0));
-  const cats = [...new Set(auto.map(o => flat.find(x => x.k === o.product_key).ci))].sort((a, b) => a - b)
-    .map(ci => NAV_LABELS[MENU[ci].n] || MENU[ci].n);
-  return `<article class="promo-item"><div><b>DESCONTO ESPECIAL</b><small>${esc(cats.join(", "))}</small><span class="promo-off">Preço já com desconto no cardápio</span></div>
-    <div class="promo-prices"><strong class="promo-new">${pct ? pct + "% OFF" : "OFERTA"}</strong></div></article>`;
+  const label = x => (x.k.split("-").length >= 3 ? x.n.replace(/\s*\([^)]*\)\s*$/, "") : fname(x));
+  const groups = new Map();   // % => nomes dos produtos
+  auto.forEach(o => {
+    const pct = Number(o.discount_percent) || 0, x = flat.find(z => z.k === o.product_key);
+    if (!groups.has(pct)) groups.set(pct, new Set());
+    groups.get(pct).add(label(x));
+  });
+  return [...groups].sort((a, b) => b[0] - a[0]).map(([pct, set]) => {
+    const names = [...set];
+    const txt = names.slice(0, 4).join(", ") + (names.length > 4 ? ` e mais ${names.length - 4}` : "");
+    return `<article class="promo-item"><div><b>DESCONTO ESPECIAL</b><small>${esc(txt)}</small><span class="promo-off">Preço já com desconto no cardápio</span></div>
+      <div class="promo-prices"><strong class="promo-new">${pct ? pct + "% OFF" : "OFERTA"}</strong></div></article>`;
+  }).join("");
 }
 function renderPromotions() {
   const box = $("#promoBanner"), list = $("#promoList");
@@ -215,14 +230,15 @@ function pizzaCard(x, ci, ii) {
 
 let favsFirst = true;
 function favsSectionHtml(open) {
-  const items = FAVORITES.map(findItem).filter(x => x && isAvailable(x.k));
+  const items = favItems();
   if (!items.length) return "";
+  favsFirst = false;
   return `<details class="category favs" id="favs" ${open ? "open" : ""}><summary><span>⭐ Mais pedidos</span><small>${items.length} ${items.length === 1 ? "produto" : "produtos"}</small></summary><div class="g">${items.map(x => productCard(by(x.k))).join("")}</div></details>`;
 }
 function renderMenu() {
   const q = $("#q").value.toLowerCase().trim();
   const wasOpen = new Set([...document.querySelectorAll("#list details[open]")].map(d => d.id));
-  const favOpen = favsFirst || wasOpen.has("favs"); favsFirst = false;
+  const favOpen = favsFirst || wasOpen.has("favs");
   const html = MENU.map((c, ci) => {
     const items = c.i.map((x, ii) => ({ x, ii })).filter(o => (o.x[0] + " " + o.x[1]).toLowerCase().includes(q));
     if (!items.length) return "";
@@ -644,8 +660,11 @@ $("#send").addEventListener("click", async e => {
 
 /* ===== Inicialização ===== */
 $("#pk").textContent = CFG.pix.key;
-$("#tabs").innerHTML = [...(FAVORITES.some(findItem) ? [["⭐ Mais pedidos", "favs"]] : []), ["Combos", "combos"], ...MENU.map((c, i) => [NAV_LABELS[c.n] || c.n, "c" + i])]
-  .map(t => `<button data-a="go" data-k="${t[1]}">${t[0]}</button>`).join("");
+function renderTabs() {
+  $("#tabs").innerHTML = [...(favItems().length ? [["⭐ Mais pedidos", "favs"]] : []), ["Combos", "combos"], ...MENU.map((c, i) => [NAV_LABELS[c.n] || c.n, "c" + i])]
+    .map(t => `<button data-a="go" data-k="${t[1]}">${t[0]}</button>`).join("");
+}
+renderTabs();
 $("#waTop").href = `https://wa.me/${CFG.wa}?text=` + encodeURIComponent("Olá! Vim pelo site e gostaria de fazer um pedido.");
 function fmtHour(h) {
   const hh = String(Math.floor(h) % 24).padStart(2, "0"), mm = Math.round((h % 1) * 60);

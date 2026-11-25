@@ -57,6 +57,7 @@
     <nav class="tabs" aria-label="Seções do painel">
       <button class="active" data-tab="orders">Pedidos <span id="newBadge" class="pill hidden">0</span></button>
       <button data-tab="stock">Disponibilidade do cardápio</button>
+      <button data-tab="favorites">Mais pedidos</button>
       <button data-tab="promotions">Banner de promoções</button>
       <button data-tab="sales">Resumo de vendas</button>
     </nav>
@@ -119,13 +120,35 @@
       <h2>Banner de promoções</h2>
       <p class="muted">Cadastre a oferta e ela aparecerá no site sem precisar de fotos. A promoção também altera o preço do produto no cardápio e no carrinho.</p>
       <form id="autoPromoForm" class="panel" style="margin:14px 0;background:#141414">
-        <h3 class="promo-form-title">PROMOÇÃO AUTOMÁTICA</h3>
-        <p class="promo-form-sub">Escolha só a porcentagem. O painel aplica o desconto em todos os produtos das categorias marcadas, com o preço já arredondado. Promoções que você criar manualmente para um produto têm prioridade.</p>
-        <label class="switch"><input id="autoActive" type="checkbox"> Promoção automática ligada</label>
-        <label class="field" style="max-width:240px">Desconto (%)<input id="autoPercent" class="search" type="number" min="1" max="99" step="1" value="10" required></label>
-        <div class="field"><label><strong>Categorias que entram na promoção</strong></label><div id="autoCats" class="filters" style="gap:8px 18px"></div></div>
-        <p id="autoStatus" class="hint"></p>
-        <button class="primary" type="submit">Salvar e aplicar</button>
+        <h3 class="promo-form-title">PROMOÇÃO POR PORCENTAGEM</h3>
+        <p class="promo-form-sub">Escolha a porcentagem, marque os produtos e a duração. O painel calcula o preço de cada um, já arredondado. Nada entra em promoção até você clicar em “Aplicar promoção”.</p>
+        <div class="promo-grid">
+          <label class="field">Desconto (%)<input id="autoPercent" class="search" type="number" min="1" max="99" step="1" value="10"></label>
+          <label class="field">Duração
+            <select id="autoDuration" class="search">
+              <option value="today" selected>Só hoje (até 23:59)</option>
+              <option value="sunday">Até domingo</option>
+              <option value="7">7 dias a partir de agora</option>
+              <option value="none">Sem data de término</option>
+              <option value="custom">Escolher datas…</option>
+            </select>
+          </label>
+        </div>
+        <div id="autoCustom" class="promo-grid hidden">
+          <label class="field">Começa em (opcional)<input id="autoStart" class="search" type="datetime-local"></label>
+          <label class="field">Termina em<input id="autoEnd" class="search" type="datetime-local"></label>
+        </div>
+        <div class="field">
+          <label><strong>Produtos da promoção</strong></label>
+          <input id="autoSearch" class="search" type="search" placeholder="Buscar produto…">
+          <div id="autoProducts" class="combo-product-groups"></div>
+          <div class="row"><span id="autoCount" class="muted">0 produtos selecionados</span><button type="button" class="secondary small" id="autoClear">Limpar seleção</button></div>
+        </div>
+        <div id="autoPreview" class="notice">Marque os produtos que entram na promoção.</div>
+        <div class="row">
+          <button class="primary" type="submit">Aplicar promoção</button>
+          <button class="danger" type="button" id="autoRemoveAll">Remover todas as promoções automáticas</button>
+        </div>
       </form>
       <form id="promoForm" class="panel" style="margin:14px 0;background:#141414">
         <input id="promoId" type="hidden">
@@ -174,6 +197,18 @@
       </form>
       <h3>Promoções cadastradas</h3>
       <div id="promotions" class="list"><div class="empty">Carregando promoções…</div></div>
+    </section>
+
+    <!-- Mais pedidos -->
+    <section id="favoritesTab" class="panel hidden">
+      <h2>Mais pedidos</h2>
+      <p class="muted">Escolha os produtos que aparecem em destaque no começo do cardápio e a ordem deles. As mudanças são salvas na hora e chegam ao site em até 2 minutos.</p>
+      <div id="favSetup" class="notice hidden"><b>Falta criar a tabela de configurações.</b><br>No Supabase, abra <i>SQL Editor</i>, cole o conteúdo do arquivo <code>mais-pedidos.sql</code> e clique em <i>Run</i>. Depois recarregue o painel. Enquanto isso, o site usa uma lista padrão.</div>
+      <h3 style="margin-top:16px">Em destaque no site</h3>
+      <div id="favList" class="list"></div>
+      <h3 style="margin-top:22px">Adicionar ou tirar produtos</h3>
+      <input id="favSearch" class="search" type="search" placeholder="Buscar produto…" style="margin-top:8px">
+      <div id="favProducts" class="combo-product-groups"></div>
     </section>
 
     <!-- Vendas -->

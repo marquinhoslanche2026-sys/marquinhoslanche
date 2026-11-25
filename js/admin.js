@@ -126,13 +126,12 @@ async function loadPromotions() {
   promotions = data || [];
 }
 async function refreshAll() {
-  await Promise.all([loadOrders(true), loadProducts(), loadPromotions()]);
+  await Promise.all([loadOrders(true), loadProducts(), loadPromotions(), loadFavorites()]);
   detectNewOrders(false);
   renderAll();
-  if (autoCfg.active) syncAutoPromos(true);
 }
 function renderAll() {
-  renderStats(); renderOrders(); renderStock(); renderSales(); renderPromotions(); fillPromoProducts();
+  renderStats(); renderOrders(); renderStock(); renderSales(); renderPromotions(); fillPromoProducts(); renderFavorites();
   $('#lastUpdate').textContent = '· atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
@@ -583,7 +582,7 @@ function fillPromoProducts() {
   if (productByKey(old)) sel.value = old;
   renderComboProductGroups();
   updatePromoPreview();
-  if (typeof renderAutoPromo === 'function' && products.length) renderAutoPromo();
+  renderAutoPicker();
 }
 function renderComboProductGroups() {
   const query = ($('#comboProductSearch').value || '').trim().toLocaleLowerCase('pt-BR');
@@ -606,13 +605,14 @@ function promoItemsText(o) {
 }
 function renderPromotions() {
   const el = $('#promotions');
-  if (!promotions.length) { el.innerHTML = '<div class="empty">Nenhuma promoção cadastrada. Use o formulário acima.</div>'; return; }
+  const regular = promotions.filter(o => !isAutoPromo(o)), autoHtml = autoGroupsHtml();
+  if (!regular.length && !autoHtml) { el.innerHTML = '<div class="empty">Nenhuma promoção cadastrada. Use o formulário acima.</div>'; return; }
   const buckets = {};
-  promotions.forEach(o => {
+  regular.forEach(o => {
     const cat = o.promo_type === 'combo' ? 'Combos promocionais' : (productByKey(o.product_key)?.category || 'Outros produtos');
     (buckets[cat] ||= []).push(o);
   });
-  el.innerHTML = Object.entries(buckets).sort((a, b) => {
+  el.innerHTML = autoHtml + Object.entries(buckets).sort((a, b) => {
     if (a[0] === 'Combos promocionais') return -1;
     if (b[0] === 'Combos promocionais') return 1;
     return categoryRank(a[0]) - categoryRank(b[0]);
@@ -700,6 +700,8 @@ $('#clearComboProducts').addEventListener('click', () => { selectedComboKeySet.c
 const toLocalInput = iso => { if (!iso) return ''; const d = new Date(iso); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
 $('#promotions').addEventListener('click', async e => {
   const edit = e.target.dataset.editPromo, toggle = e.target.dataset.togglePromo, del = e.target.dataset.deletePromo;
+  const aDel = e.target.dataset.autoDel, aTog = e.target.dataset.autoToggle;
+  if (aDel || aTog) { await autoGroupAction(aDel || aTog, aDel ? 'del' : 'toggle'); return; }
   if (edit) {
     const o = promotions.find(x => x.id === edit);
     if (!o) return;
@@ -736,76 +738,219 @@ $('#promotions').addEventListener('click', async e => {
   }
 });
 
-/* ===== Promoção automática (você escolhe só a %) =====
-   Cria uma promoção por produto (com preço arredondado) nas categorias marcadas.
+/* ===== Promoção por porcentagem =====
+   Você escolhe a %, os produtos e a duração; nada entra em promoção sem clicar em "Aplicar".
+   Cria uma promoção por produto (preço arredondado). O fim da promoção é respeitado pelo próprio site.
    Promoções manuais de um produto têm prioridade e nunca são alteradas aqui. */
-let autoCfg = { active: false, percent: 10, cats: null };
-try { autoCfg = { ...autoCfg, ...JSON.parse(localStorage.getItem('ml_admin_auto_promo') || '{}') }; } catch (e) { /* ignorar */ }
-const saveAutoCfg = () => { try { localStorage.setItem('ml_admin_auto_promo', JSON.stringify(autoCfg)); } catch (e) { /* ignorar */ } };
-const autoPromos = () => promotions.filter(o => o.title === AUTO_TITLE && o.promo_type !== 'combo');
-
-function renderAutoPromo() {
-  const cats = groupedProducts().map(([c]) => c);
-  const chosen = autoCfg.cats || cats;
-  $('#autoActive').checked = !!autoCfg.active;
-  $('#autoPercent').value = autoCfg.percent;
-  $('#autoCats').innerHTML = cats.map(c => `<label class="switch"><input type="checkbox" data-auto-cat="${esc(c)}" ${chosen.includes(c) ? 'checked' : ''}> ${esc(categoryName(c))}</label>`).join('');
-  const n = autoPromos().length;
-  $('#autoStatus').textContent = n ? `${n} produto(s) com a promoção automática aplicada agora.` : 'Nenhuma promoção automática aplicada no momento.';
+const isAutoPromo = o => o.title === AUTO_TITLE && o.promo_type !== 'combo';
+const autoPromos = () => promotions.filter(isAutoPromo);
+let autoSel = new Set();   // seleção por item (pizzas: todos os tamanhos do sabor)
+const baseKey = p => { const x = String(p.product_key).split('-'); return x.length >= 3 ? x.slice(0, 2).join('-') : String(p.product_key); };
+function autoUnits() {
+  const map = new Map();
+  [...products].sort(byMenuOrder).forEach(p => {
+    const base = baseKey(p), isPizza = String(p.product_key).split('-').length >= 3;
+    if (!map.has(base)) map.set(base, { base, cat: p.category || 'Outros', name: isPizza ? String(p.name).replace(/\s*\([^)]*\)\s*$/, '') : p.name, items: [] });
+    map.get(base).items.push(p);
+  });
+  return [...map.values()];
 }
-async function syncAutoPromos(silent = false) {
-  const now = new Date().toISOString();
-  const existing = autoPromos();
-  let toDelete = [], toInsert = [], toUpdate = [];
-  if (!autoCfg.active) {
-    toDelete = existing.map(o => o.id);
-  } else {
-    const cats = autoCfg.cats || groupedProducts().map(([c]) => c);
-    const manual = new Set(promotions.filter(o => o.title !== AUTO_TITLE && o.promo_type !== 'combo' && o.product_key).map(o => o.product_key));
-    const wanted = new Map();
-    products.forEach(p => {
-      if (!cats.includes(p.category || 'Outros') || manual.has(p.product_key)) return;
-      const price = roundPromoPrice(Number(p.price), autoCfg.percent);
-      if (price) wanted.set(p.product_key, price);
+const autoUnitPrice = u => u.items.length > 1 ? 'a partir de ' + money(Math.min(...u.items.map(p => Number(p.price)))) : money(u.items[0].price);
+
+function renderAutoPicker() {
+  const q = ($('#autoSearch').value || '').trim().toLocaleLowerCase('pt-BR'), cats = new Map();
+  autoUnits().forEach(u => { if (!cats.has(u.cat)) cats.set(u.cat, []); cats.get(u.cat).push(u); });
+  $('#autoProducts').innerHTML = [...cats].map(([cat, us]) => {
+    const shown = us.filter(u => !q || (u.name + ' ' + cat).toLocaleLowerCase('pt-BR').includes(q));
+    if (!shown.length) return '';
+    const sel = us.filter(u => autoSel.has(u.base)).length;
+    return `<section class="combo-product-category"><h4 class="auto-cat-head"><span>${esc(categoryName(cat))} <span style="color:#aaa;font-weight:400">(${sel}/${us.length})</span></span><span class="auto-cat-btns"><button type="button" class="secondary small" data-auto-cat-on="${esc(cat)}">Marcar todos</button><button type="button" class="secondary small" data-auto-cat-off="${esc(cat)}">Limpar</button></span></h4><div class="combo-product-options">${shown.map(u => `<label class="combo-product-option"><input type="checkbox" data-auto-key="${esc(u.base)}" ${autoSel.has(u.base) ? 'checked' : ''}><span>${esc(u.name)}<small>${autoUnitPrice(u)}</small></span></label>`).join('')}</div></section>`;
+  }).join('') || '<div class="empty">Nenhum produto encontrado.</div>';
+  updateAutoPreview();
+}
+function autoPlan(pct) {
+  const manual = new Set(promotions.filter(o => !isAutoPromo(o) && o.promo_type !== 'combo' && o.product_key).map(o => o.product_key));
+  const existing = new Map(autoPromos().map(o => [o.product_key, o]));
+  const rows = [], skipped = [], examples = [];
+  autoUnits().filter(u => autoSel.has(u.base)).forEach(u => {
+    let first = true;
+    u.items.forEach(p => {
+      if (manual.has(p.product_key)) { skipped.push(u.name); return; }
+      const price = roundPromoPrice(Number(p.price), pct);
+      if (!price) return;
+      rows.push({ p, price, existing: existing.get(p.product_key) });
+      if (first) { first = false; examples.push(`${u.name}: ${money(p.price)} → ${money(price)}`); }
     });
-    existing.forEach(o => {
-      const price = wanted.get(o.product_key);
-      if (!price) { toDelete.push(o.id); return; }
-      wanted.delete(o.product_key);
-      if (Number(o.promo_price) !== price || Number(o.discount_percent) !== autoCfg.percent || !o.active || o.discount_mode !== 'percent')
-        toUpdate.push({ ...o, promo_price: price, discount_percent: autoCfg.percent, discount_mode: 'percent', active: true, updated_at: now });
-    });
-    wanted.forEach((price, key) => toInsert.push({
-      promo_type: 'product', discount_mode: 'percent', product_key: key, combo_items: [], title: AUTO_TITLE,
-      promo_price: price, discount_percent: autoCfg.percent, active: true, starts_at: null, ends_at: null, updated_at: now
-    }));
+  });
+  return { rows, skipped: [...new Set(skipped)], examples };
+}
+function updateAutoPreview() {
+  const pct = Number($('#autoPercent').value), n = autoSel.size, box = $('#autoPreview');
+  $('#autoCount').textContent = `${n} ${n === 1 ? 'produto selecionado' : 'produtos selecionados'}`;
+  if (!n) { box.textContent = 'Marque os produtos que entram na promoção. Nada muda até você clicar em “Aplicar promoção”.'; return; }
+  if (!(pct > 0 && pct < 100)) { box.textContent = 'Informe um desconto entre 1 e 99%.'; return; }
+  const plan = autoPlan(pct);
+  box.textContent = `${n} ${n === 1 ? 'produto' : 'produtos'} com ${pct}% OFF.` +
+    (plan.examples.length ? ' Exemplos: ' + plan.examples.slice(0, 3).join(' · ') + '.' : '') +
+    (plan.skipped.length ? ` Ficam com a promoção manual: ${plan.skipped.join(', ')}.` : '');
+}
+function autoWindow() {
+  const v = $('#autoDuration').value, now = new Date();
+  const endOfDay = d => { const x = new Date(d); x.setHours(23, 59, 59, 0); return x.toISOString(); };
+  if (v === 'today') return { starts: null, ends: endOfDay(now) };
+  if (v === 'sunday') { const x = new Date(now); x.setDate(x.getDate() + ((7 - x.getDay()) % 7)); return { starts: null, ends: endOfDay(x) }; }
+  if (v === '7') return { starts: null, ends: new Date(Date.now() + 7 * 864e5).toISOString() };
+  if (v === 'custom') {
+    const s = $('#autoStart').value, e = $('#autoEnd').value;
+    if (!e) return { error: 'Informe quando a promoção termina.' };
+    if (s && new Date(e) <= new Date(s)) return { error: 'A data final precisa ser depois da inicial.' };
+    return { starts: s ? new Date(s).toISOString() : null, ends: new Date(e).toISOString() };
   }
-  if (!toDelete.length && !toInsert.length && !toUpdate.length) return true;
-  let error = null;
-  if (toDelete.length) ({ error } = await db.from('promotions').delete().in('id', toDelete));
-  if (!error && toUpdate.length) ({ error } = await db.from('promotions').upsert(toUpdate));
-  if (!error && toInsert.length) ({ error } = await db.from('promotions').insert(toInsert));
-  if (error) { say('Erro na promoção automática: ' + error.message, true); return false; }
-  await loadPromotions(); renderPromotions(); renderAutoPromo();
-  if (!silent) say(autoCfg.active ? `Promoção automática de ${autoCfg.percent}% aplicada.` : 'Promoção automática desligada.');
-  return true;
+  return { starts: null, ends: null };
 }
 $('#autoPromoForm').addEventListener('submit', async e => {
   e.preventDefault();
   const pct = Number($('#autoPercent').value);
-  if (!(pct > 0 && pct < 100)) { say('Informe uma porcentagem entre 1 e 99.', true); return; }
-  const all = groupedProducts().map(([c]) => c);
-  const chosen = [...document.querySelectorAll('[data-auto-cat]')].filter(x => x.checked).map(x => x.dataset.autoCat);
-  if ($('#autoActive').checked && !chosen.length) { say('Marque pelo menos uma categoria.', true); return; }
-  autoCfg = { active: $('#autoActive').checked, percent: pct, cats: chosen.length === all.length ? null : chosen };
-  saveAutoCfg();
-  await syncAutoPromos();
+  if (!(pct > 0 && pct < 100)) { say('Informe um desconto entre 1 e 99%.', true); return; }
+  if (!autoSel.size) { say('Marque pelo menos um produto.', true); return; }
+  const win = autoWindow();
+  if (win.error) { say(win.error, true); return; }
+  const plan = autoPlan(pct);
+  if (!plan.rows.length) { say('Os produtos marcados já têm promoção manual ou o desconto não gera preço menor.', true); return; }
+  const now = new Date().toISOString();
+  const mk = r => ({ promo_type: 'product', discount_mode: 'percent', product_key: r.p.product_key, combo_items: [], title: AUTO_TITLE,
+    promo_price: r.price, discount_percent: pct, active: true, starts_at: win.starts, ends_at: win.ends, updated_at: now });
+  const upd = plan.rows.filter(r => r.existing).map(r => ({ ...mk(r), id: r.existing.id }));
+  const ins = plan.rows.filter(r => !r.existing).map(mk);
+  let error = null;
+  if (upd.length) ({ error } = await db.from('promotions').upsert(upd));
+  if (!error && ins.length) ({ error } = await db.from('promotions').insert(ins));
+  if (error) { say('Erro ao aplicar a promoção: ' + error.message, true); return; }
+  say(`Promoção de ${pct}% aplicada em ${autoSel.size} ${autoSel.size === 1 ? 'produto' : 'produtos'}.`);
+  autoSel.clear();
+  await loadPromotions(); renderPromotions(); renderAutoPicker();
 });
+$('#autoProducts').addEventListener('change', e => {
+  const k = e.target.dataset.autoKey;
+  if (!k) return;
+  if (e.target.checked) autoSel.add(k); else autoSel.delete(k);
+  renderAutoPicker();
+});
+$('#autoProducts').addEventListener('click', e => {
+  const on = e.target.dataset.autoCatOn, off = e.target.dataset.autoCatOff;
+  if (on === undefined && off === undefined) return;
+  autoUnits().filter(u => u.cat === (on ?? off)).forEach(u => { if (on !== undefined) autoSel.add(u.base); else autoSel.delete(u.base); });
+  renderAutoPicker();
+});
+$('#autoSearch').addEventListener('input', renderAutoPicker);
+$('#autoPercent').addEventListener('input', updateAutoPreview);
+$('#autoDuration').addEventListener('change', () => $('#autoCustom').classList.toggle('hidden', $('#autoDuration').value !== 'custom'));
+$('#autoClear').addEventListener('click', () => { autoSel.clear(); renderAutoPicker(); });
+$('#autoRemoveAll').addEventListener('click', async () => {
+  const ids = autoPromos().map(o => o.id);
+  if (!ids.length) { say('Não há promoções automáticas aplicadas.'); return; }
+  if (!confirm(`Remover as promoções automáticas de ${ids.length} produto(s)? Os preços voltam ao normal.`)) return;
+  const { error } = await db.from('promotions').delete().in('id', ids);
+  if (error) { say('Erro ao remover: ' + error.message, true); return; }
+  say('Promoções automáticas removidas.');
+  await loadPromotions(); renderPromotions();
+});
+
+/* Lista: as promoções automáticas aparecem agrupadas (por % e data de término), não uma por produto */
+const autoGroupKey = o => `${Number(o.discount_percent) || 0}|${o.ends_at || ''}`;
+function autoGroupsHtml() {
+  const list = autoPromos();
+  if (!list.length) return '';
+  const groups = new Map();
+  list.forEach(o => { const k = autoGroupKey(o); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o); });
+  const now = Date.now();
+  return `<section class="promo-section"><div class="promo-section-head"><h3>⚡ Promoções por porcentagem</h3><span>${groups.size} ${groups.size === 1 ? 'grupo' : 'grupos'}</span></div><div class="list">${[...groups].map(([k, items]) => {
+    const first = items[0], ended = first.ends_at && new Date(first.ends_at).getTime() < now, allOff = items.every(o => !o.active);
+    const names = [...new Set(items.map(o => { const p = productByKey(o.product_key); return p ? (String(o.product_key).split('-').length >= 3 ? String(p.name).replace(/\s*\([^)]*\)\s*$/, '') : p.name) : o.product_key; }))];
+    const status = ended ? '○ ENCERRADA' : allOff ? '○ DESATIVADA' : '● ATIVA';
+    return `<article class="product promo-list-card"><div style="flex:1;min-width:220px"><div class="name">${Number(first.discount_percent)}% OFF em ${names.length} ${names.length === 1 ? 'produto' : 'produtos'}</div>
+      <div style="margin-top:7px"><span class="promo-pill">${status}</span></div>
+      <div class="meta" style="margin-top:8px">${esc(names.slice(0, 8).join(', '))}${names.length > 8 ? ` e mais ${names.length - 8}` : ''}</div>
+      <div class="meta">${first.ends_at ? (ended ? 'Terminou em ' : 'Termina em ') + new Date(first.ends_at).toLocaleString('pt-BR') : 'Sem data de término'}</div></div>
+      <div class="order-actions promo-actions"><button class="secondary small" data-auto-toggle="${esc(k)}">${allOff ? 'Ativar' : 'Desativar'}</button><button class="danger small" data-auto-del="${esc(k)}">Remover</button></div></article>`;
+  }).join('')}</div></section>`;
+}
+async function autoGroupAction(key, mode) {
+  const items = autoPromos().filter(o => autoGroupKey(o) === key), ids = items.map(o => o.id);
+  if (!ids.length) return;
+  let error;
+  if (mode === 'del') {
+    if (!confirm(`Remover esta promoção de ${ids.length} produto(s)? Os preços voltam ao normal.`)) return;
+    ({ error } = await db.from('promotions').delete().in('id', ids));
+  } else {
+    const turnOn = items.every(o => !o.active);
+    ({ error } = await db.from('promotions').update({ active: turnOn, updated_at: new Date().toISOString() }).in('id', ids));
+  }
+  if (error) { say('Erro ao alterar a promoção: ' + error.message, true); return; }
+  say(mode === 'del' ? 'Promoção removida.' : 'Status da promoção atualizado.');
+  await loadPromotions(); renderPromotions();
+}
+
+/* ===== Mais pedidos (lista de destaque do cardápio) =====
+   Guardada na tabela site_settings (chave "favorites") como lista de product_key, na ordem de exibição. */
+let favKeys = [], favMissing = false;
+async function loadFavorites() {
+  const { data, error } = await db.from('site_settings').select('value').eq('key', 'favorites').maybeSingle();
+  favMissing = !!error;
+  favKeys = !error && Array.isArray(data?.value) ? data.value.map(String) : [];
+}
+async function saveFavorites() {
+  const { error } = await db.from('site_settings').upsert({ key: 'favorites', value: favKeys, updated_at: new Date().toISOString() });
+  if (error) {
+    say('Não foi possível salvar. Confirme que o arquivo mais-pedidos.sql foi executado: ' + error.message, true);
+    await loadFavorites(); renderFavorites();
+    return;
+  }
+  favMissing = false;
+  say('Mais pedidos atualizado. O site reflete em até 2 minutos.');
+  renderFavorites();
+}
+function renderFavorites() {
+  $('#favSetup').classList.toggle('hidden', !favMissing);
+  const byKey = new Map(products.map(p => [p.product_key, p]));
+  $('#favList').innerHTML = favKeys.length
+    ? favKeys.map((k, i) => { const p = byKey.get(k); return `<div class="product"><div><div class="name">${i + 1}º · ${esc(p ? p.name : k)}</div><div class="meta">${p ? esc(p.category || '') + ' · ' + money(p.price) : 'Produto não encontrado no cardápio'}</div></div>
+      <div class="order-actions" style="margin:0"><button class="secondary small" data-fav-up="${i}" ${i === 0 ? 'disabled' : ''} aria-label="Subir">▲</button><button class="secondary small" data-fav-down="${i}" ${i === favKeys.length - 1 ? 'disabled' : ''} aria-label="Descer">▼</button><button class="danger small" data-fav-del="${i}">Remover</button></div></div>`; }).join('')
+    : '<div class="empty">Nenhum produto em destaque. Marque produtos abaixo e a seção “Mais pedidos” aparece no site.</div>';
+  const q = ($('#favSearch').value || '').trim().toLocaleLowerCase('pt-BR');
+  const singles = products.filter(p => String(p.product_key).split('-').length < 3);   // pizzas têm montador próprio
+  $('#favProducts').innerHTML = groupedProducts(singles).map(([cat, items]) => {
+    const shown = items.filter(p => !q || (p.name + ' ' + cat).toLocaleLowerCase('pt-BR').includes(q));
+    if (!shown.length) return '';
+    return `<section class="combo-product-category"><h4>${esc(categoryName(cat))}</h4><div class="combo-product-options">${shown.map(p => `<label class="combo-product-option"><input type="checkbox" data-fav-key="${esc(p.product_key)}" ${favKeys.includes(p.product_key) ? 'checked' : ''}><span>${esc(p.name)}<small>${money(p.price)}</small></span></label>`).join('')}</div></section>`;
+  }).join('') || '<div class="empty">Nenhum produto encontrado.</div>';
+}
+$('#favProducts').addEventListener('change', async e => {
+  const k = e.target.dataset.favKey;
+  if (!k) return;
+  favKeys = e.target.checked ? [...favKeys.filter(x => x !== k), k] : favKeys.filter(x => x !== k);
+  await saveFavorites();
+});
+$('#favList').addEventListener('click', async e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const up = b.dataset.favUp, down = b.dataset.favDown, del = b.dataset.favDel;
+  const i = Number(up ?? down ?? del);
+  if (Number.isNaN(i)) return;
+  if (del !== undefined) favKeys.splice(i, 1);
+  else {
+    const j = up !== undefined ? i - 1 : i + 1;
+    if (j < 0 || j >= favKeys.length) return;
+    [favKeys[i], favKeys[j]] = [favKeys[j], favKeys[i]];
+  }
+  await saveFavorites();
+});
+$('#favSearch').addEventListener('input', renderFavorites);
 
 /* ===== Navegação por abas e atualização manual ===== */
 document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
   document.querySelectorAll('[data-tab]').forEach(x => x.classList.toggle('active', x === b));
-  ['orders', 'stock', 'promotions', 'sales'].forEach(t => $('#' + t + 'Tab').classList.toggle('hidden', t !== b.dataset.tab));
+  ['orders', 'stock', 'favorites', 'promotions', 'sales'].forEach(t => $('#' + t + 'Tab').classList.toggle('hidden', t !== b.dataset.tab));
   if (b.dataset.tab === 'sales') renderSales();
 });
 $('#refresh').onclick = async () => { await refreshAll(); say('Dados atualizados.'); };

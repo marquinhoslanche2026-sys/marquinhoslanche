@@ -125,3 +125,7 @@ button:disabled{opacity:.5;cursor:default}
   .promo-grid .field{margin:4px 0}
 }
 @media(max-width:520px){.combo-product-options{grid-template-columns:1fr}}
+
+/* ---------- Promoção por porcentagem ---------- */
+.combo-product-category h4.auto-cat-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.auto-cat-btns{margin-left:auto;display:flex;gap:6px}
