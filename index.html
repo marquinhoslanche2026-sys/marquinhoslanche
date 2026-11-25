@@ -33,6 +33,8 @@
   <span class="lg"><img src="assets/logo.jpg" alt="Logo Marquinho’s Lanches" width="170" height="170"></span>
 </div>
 
+<p id="openNote" class="open-note" hidden></p>
+
 <section id="promoBanner" class="promo-banner" hidden aria-label="Promoções">
   <div class="promo-head"><span>OFERTAS ESPECIAIS</span><span class="promo-star">✦</span></div>
   <h2>PREÇOS QUE <em>VALEM A PENA</em></h2>
@@ -63,9 +65,11 @@
   <div class="hd"><h2>Seu pedido</h2><button class="x" data-a="close" aria-label="Fechar">✕</button></div>
   <p class="cart-help">Confira os itens, ajuste as quantidades e só depois envie o pedido pelo WhatsApp.</p>
   <div id="lines"></div>
+  <div id="upsell"></div>
   <p id="closedNote" class="closed-note" hidden>Estamos fechados agora. Você pode enviar o pedido e ele será atendido a partir das 19h30.</p>
   <label>Nome<input id="nm" type="text" autocomplete="name"></label>
   <label>Telefone (WhatsApp)<input id="ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="(93) 99999-9999"></label>
+  <p class="hint">Seus dados ficam salvos neste aparelho para o próximo pedido. <button type="button" class="linkbtn" data-a="forget">Limpar meus dados</button></p>
   <fieldset><legend>Como receber?</legend>
     <label><input type="radio" name="t" value="Entrega" checked> Entrega (+ R$ 5,00)</label>
     <label><input type="radio" name="t" value="Retirada"> Retirar no local</label>
@@ -115,14 +119,28 @@
     <select id="pzs"><option value="0">Pequena</option><option value="1">Média</option><option value="2">Grande</option><option value="3">Família</option></select>
   </label>
   <p id="pzlimit" class="hint"></p>
+  <p id="pzcount" class="pz-count"></p>
   <div id="pzflavors"></div>
   <label>Batata (opcional)<select id="pzbat"><option value="">Sem batata</option></select></label>
   <label>Refrigerante (opcional)<select id="pzdrink"><option value="">Sem refrigerante</option></select></label>
   <label>Adicionais / observações
     <textarea id="pznotes" rows="3" maxlength="300" placeholder="Ex.: borda recheada, retirar cebola, molho à parte... (eventuais valores serão confirmados)"></textarea>
   </label>
-  <div class="sum t"><span>Total</span><span id="pztotal"></span></div>
-  <button class="btn" id="pzadd" style="width:100%;margin-top:12px;min-height:52px">Adicionar ao pedido</button>
+  <div class="pz-foot">
+    <p id="pzbreak" class="hint"></p>
+    <div class="sum t"><span>Total</span><span id="pztotal"></span></div>
+    <button class="btn" id="pzadd" style="width:100%;margin-top:10px;min-height:52px">Adicionar ao pedido</button>
+  </div>
+</div></div>
+
+<!-- Confirmação do pedido -->
+<div class="dr" id="okm" hidden role="dialog" aria-modal="true" aria-label="Pedido registrado"><div class="pn ok-pn">
+  <div class="ok-ico" aria-hidden="true">✓</div>
+  <h2 class="ok-t">Pedido registrado!</h2>
+  <p id="okmsg"></p>
+  <p id="oknote" class="ok-note" hidden></p>
+  <a class="wa" id="okwa" target="_blank" rel="noopener">Abrir WhatsApp e enviar</a>
+  <button class="btn" data-a="okx">Voltar ao cardápio</button>
 </div></div>
 
 <script src="js/menu-data.js"></script>

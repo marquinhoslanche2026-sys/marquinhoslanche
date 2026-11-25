@@ -22,6 +22,20 @@ const NAV_LABELS = {
   "Pizzas Especiais": "Especiais"
 };
 
+/* Título usado pelo painel nas promoções automáticas (não altere) */
+const AUTO_TITLE = "PROMOÇÃO AUTOMÁTICA";
+/* "Mais pedidos": edite aqui os itens que mais vendem — formato [categoria, nome do item] */
+const FAVORITES = [
+  ["Hambúrguer Industrial", "X-Salada"],
+  ["Hambúrguer Industrial", "X-Bacon"],
+  ["Hambúrguer Artesanal", "Picanha Barbecue"],
+  ["Acompanhamentos", "Batata Especial"],
+  ["Bebidas", "Refrigerante 2 litros"]
+];
+/* Sugestões mostradas no carrinho quando o cliente ainda não escolheu bebida / acompanhamento */
+const UPSELL_DRINKS = [["Bebidas", "Refrigerante lata"], ["Bebidas", "Suco natural 400 ml"], ["Bebidas", "Refrigerante 2 litros"]];
+const UPSELL_SIDES = [["Acompanhamentos", "Batata Tradicional"], ["Acompanhamentos", "Mini Nuggets"], ["Acompanhamentos", "Batata com Cheddar"]];
+
 /* ===== Utilidades ===== */
 const $ = s => document.querySelector(s);
 const R = v => "R$ " + Number(v || 0).toFixed(2).replace(".", ",");
@@ -56,6 +70,7 @@ MENU.forEach((c, ci) => c.i.forEach((x, ii) => {
   }
 }));
 const catIndex = name => MENU.findIndex(c => c.n === name);
+const findItem = ([cat, name]) => flat.find(x => MENU[x.ci].n === cat && x.n === name);
 const isAvailable = k => availability[k] !== false;
 
 /* ===== Estado do carrinho ===== */
@@ -72,6 +87,10 @@ const offerQuantity = o => {
   return Math.max(1, e ? entryQty(e) : 1);
 };
 const productOffer = k => promotions.find(o => o.promo_type !== "combo" && o.product_key === k);
+const promoPct = (normal, oq, o) => {
+  const p = Math.round((1 - Number(o.promo_price) / (normal * oq)) * 100);
+  return p > 0 ? `-${p}%` : "PROMOÇÃO";
+};
 
 function lineTotal(k) {
   if (combos[k]) return Number(combos[k].p) * cart[k];
@@ -137,13 +156,23 @@ function comboNames(o) {
     return p ? `${entryQty(i)}× ${fname(p)}` : null;
   }).filter(Boolean);
 }
+function autoBannerHtml(auto) {
+  if (!auto.length) return "";
+  const pct = Math.max(...auto.map(o => Number(o.discount_percent) || 0));
+  const cats = [...new Set(auto.map(o => flat.find(x => x.k === o.product_key).ci))].sort((a, b) => a - b)
+    .map(ci => NAV_LABELS[MENU[ci].n] || MENU[ci].n);
+  return `<article class="promo-item"><div><b>DESCONTO ESPECIAL</b><small>${esc(cats.join(", "))}</small><span class="promo-off">Preço já com desconto no cardápio</span></div>
+    <div class="promo-prices"><strong class="promo-new">${pct ? pct + "% OFF" : "OFERTA"}</strong></div></article>`;
+}
 function renderPromotions() {
   const box = $("#promoBanner"), list = $("#promoList");
-  const valid = promotions.map(o => ({ ...o, item: flat.find(x => x.k === o.product_key), names: comboNames(o) }))
+  const isAuto = o => o.title === AUTO_TITLE && o.promo_type !== "combo";
+  const auto = promotions.filter(o => isAuto(o) && flat.some(x => x.k === o.product_key));
+  const valid = promotions.filter(o => !isAuto(o)).map(o => ({ ...o, item: flat.find(x => x.k === o.product_key), names: comboNames(o) }))
     .filter(o => o.promo_type === "combo" ? o.names.length >= 2 : !!o.item);
-  if (!valid.length) { box.hidden = true; return; }
+  if (!valid.length && !auto.length) { box.hidden = true; return; }
   box.hidden = false;
-  list.innerHTML = valid.map(o => {
+  list.innerHTML = autoBannerHtml(auto) + valid.map(o => {
     const combo = o.promo_type === "combo";
     const name = combo ? (o.title || "COMBO PROMOCIONAL") : (o.title && o.title !== "OFERTA ESPECIAL" ? o.title : o.item.n);
     const desc = combo ? o.names.join(" + ") : fname(o.item);
@@ -164,23 +193,36 @@ function productCard(x) {
   const off = !isAvailable(x.k), offer = productOffer(x.k), oq = offer ? offerQuantity(offer) : 1;
   const normal = flat.find(z => z.k === x.k)?.p || x.p;
   const price = offer ? `<span><del>${R(normal * oq)}</del><b>${R(oq > 1 ? offer.promo_price : x.p)}</b></span>` : `<b>${R(x.p)}</b>`;
-  return `<article class="it ${off ? "unavailable" : ""}"><h3>${esc(x.n)}${offer ? " <small>🔥 PROMOÇÃO</small>" : ""}</h3>
+  return `<article class="it ${off ? "unavailable" : ""}"><h3>${esc(x.n)}${offer ? ` <small>🔥 ${promoPct(normal, oq, offer)}</small>` : ""}</h3>
     ${x.d ? `<p>${esc(x.d)}</p>` : ""}
     ${offer && oq > 1 ? `<p class="deal">${oq} unidades por ${R(offer.promo_price)} <small>(${R(Number(offer.promo_price) / oq)} cada)</small></p>` : ""}
     ${off ? '<span class="stock-note">Indisponível no momento</span>' : ""}
     <div class="ft">${price}${off ? "" : qtyControl(x.k)}</div></article>`;
 }
+function pizzaPriceHtml(ci, ii, s, p) {
+  const o = productOffer(`${ci}-${ii}-${s}`);
+  return o && offerQuantity(o) === 1
+    ? `<div style="text-align:right"><del>${R(p)}</del><b>${R(o.promo_price)}</b></div>`
+    : `<b>${R(p)}</b>`;
+}
 function pizzaCard(x, ci, ii) {
   const rows = x[2].map((p, s) => {
     const off = !isAvailable(`${ci}-${ii}-${s}`);
-    return `<div class="ft sz"><span>${SIZE_NAMES[s]}<small>${SIZE_SLICES[s]}</small>${off ? '<small class="stock-note">Indisponível</small>' : ""}</span><b>${R(p)}</b>${off ? "" : `<button class="add" data-a="pzb" data-k="${ci}-${ii}" data-size="${s}">Montar</button>`}</div>`;
+    return `<div class="ft sz"><span>${SIZE_NAMES[s]}<small>${SIZE_SLICES[s]}</small>${off ? '<small class="stock-note">Indisponível</small>' : ""}</span>${pizzaPriceHtml(ci, ii, s, p)}${off ? "" : `<button class="add" data-a="pzb" data-k="${ci}-${ii}" data-size="${s}">Montar</button>`}</div>`;
   }).join("");
   return `<article class="it"><h3>${esc(x[0])}</h3><p>${esc(x[1])}</p>${rows}</article>`;
 }
 
+let favsFirst = true;
+function favsSectionHtml(open) {
+  const items = FAVORITES.map(findItem).filter(x => x && isAvailable(x.k));
+  if (!items.length) return "";
+  return `<details class="category favs" id="favs" ${open ? "open" : ""}><summary><span>⭐ Mais pedidos</span><small>${items.length} ${items.length === 1 ? "produto" : "produtos"}</small></summary><div class="g">${items.map(x => productCard(by(x.k))).join("")}</div></details>`;
+}
 function renderMenu() {
   const q = $("#q").value.toLowerCase().trim();
   const wasOpen = new Set([...document.querySelectorAll("#list details[open]")].map(d => d.id));
+  const favOpen = favsFirst || wasOpen.has("favs"); favsFirst = false;
   const html = MENU.map((c, ci) => {
     const items = c.i.map((x, ii) => ({ x, ii })).filter(o => (o.x[0] + " " + o.x[1]).toLowerCase().includes(q));
     if (!items.length) return "";
@@ -188,7 +230,7 @@ function renderMenu() {
     const open = q || wasOpen.has("c" + ci) ? "open" : "";
     return `<details class="category" id="c${ci}" ${open}><summary><span>${esc(c.n)}</span><small>${items.length} ${items.length === 1 ? "produto" : "produtos"}</small></summary><div class="g">${cards}</div></details>`;
   }).join("");
-  $("#list").innerHTML = (q ? "" : comboSectionHtml(wasOpen.has("combos"))) + (html || '<p class="empty">Nada encontrado. Tente outro nome.</p>');
+  $("#list").innerHTML = (q ? "" : favsSectionHtml(favOpen) + comboSectionHtml(wasOpen.has("combos"))) + (html || '<p class="empty">Nada encontrado. Tente outro nome.</p>');
 }
 
 /* ===== Combos de lanches ===== */
@@ -242,37 +284,59 @@ function openCombo(id) {
 let pzSize = 0, pzCombo = null;
 const fillOptional = (sel, items) => { sel.innerHTML = '<option value="">Nenhum</option>' + items.map(x => `<option value="${x.k}">${esc(x.n)} · ${R(x.p)}</option>`).join(""); };
 
+const flavorPrice = (ci, ii, s) => {
+  const o = productOffer(`${ci}-${ii}-${s}`);
+  return o && offerQuantity(o) === 1 ? Number(o.promo_price) : MENU[ci].i[ii][2][s];
+};
 function chosenFlavors() {
   return [...document.querySelectorAll("#pzflavors input:checked")].map(el => {
     const ci = Number(el.dataset.ci), ii = Number(el.dataset.ii), it = MENU[ci].i[ii];
-    return { ci, ii, name: it[0], prices: it[2] };
+    return { ci, ii, name: it[0], price: flavorPrice(ci, ii, pzSize), base: it[2][pzSize] };
   });
+}
+/* Regra de mistura: só tradicionais = preço do 1º sabor; só especiais = o maior; com os dois = tradicional + diferença dos especiais dividida pelo nº de sabores */
+function mixPrice(chosen, get) {
+  if (!chosen.length) return 0;
+  const tradCi = catIndex("Pizzas Tradicionais");
+  const trad = chosen.filter(x => x.ci === tradCi), spec = chosen.filter(x => x.ci !== tradCi);
+  if (!trad.length) return Math.max(...spec.map(get));
+  const t = get(trad[0]);
+  return spec.length ? t + spec.reduce((s, x) => s + Math.max(0, get(x) - t), 0) / chosen.length : t;
 }
 function pizzaPrice() {
   const chosen = chosenFlavors();
-  const tradCi = catIndex("Pizzas Tradicionais");
-  let price = 0;
-  if (chosen.length) {
-    const trad = chosen.filter(x => x.ci === tradCi), spec = chosen.filter(x => x.ci !== tradCi);
-    if (!trad.length) price = Math.max(...spec.map(x => x.prices[pzSize]));
-    else {
-      const t = trad[0].prices[pzSize];
-      price = spec.length ? t + spec.reduce((s, x) => s + Math.max(0, x.prices[pzSize] - t), 0) / chosen.length : t;
-    }
-  }
+  const pizza = mixPrice(chosen, x => x.price), normal = mixPrice(chosen, x => x.base);
   const bat = by($("#pzbat").value), drink = by($("#pzdrink").value);
-  price += (bat ? bat.p : 0) + (drink ? drink.p : 0);
+  const price = Math.round((pizza + (bat ? bat.p : 0) + (drink ? drink.p : 0)) * 100) / 100;
   $("#pztotal").textContent = R(price);
+  const parts = [];
+  if (chosen.length && (bat || drink)) {
+    parts.push(`Pizza ${R(pizza)}`);
+    if (bat) parts.push(`${bat.n} ${R(bat.p)}`);
+    if (drink) parts.push(`${drink.n} ${R(drink.p)}`);
+  }
+  const saved = normal - pizza;
+  $("#pzbreak").textContent = parts.join(" + ") + (saved > 0.005 ? `${parts.length ? " · " : ""}Promoção aplicada: você economiza ${R(saved)}` : "");
   return { price, chosen, bat, drink };
 }
-function renderPizzaFlavors() {
+function renderPizzaFlavors(keep = new Set()) {
   $("#pzflavors").innerHTML = ["Pizzas Tradicionais", "Pizzas Especiais"].map(cat => {
     const ci = catIndex(cat);
     return `<fieldset><legend>${cat}</legend>${MENU[ci].i.map((x, ii) => {
-      const off = !isAvailable(`${ci}-${ii}-${pzSize}`);
-      return `<label><input type="checkbox" data-ci="${ci}" data-ii="${ii}" ${off ? "disabled" : ""}> <span>${esc(x[0])} <small>(${R(x[2][pzSize])})${off ? " · indisponível" : ""}</small></span></label>`;
+      const off = !isAvailable(`${ci}-${ii}-${pzSize}`), p = flavorPrice(ci, ii, pzSize), promo = p !== x[2][pzSize];
+      const on = !off && keep.has(`${ci}-${ii}`);
+      return `<label class="pzopt"><input type="checkbox" data-ci="${ci}" data-ii="${ii}" ${off ? "disabled" : ""} ${on ? "checked" : ""}><span><b>${esc(x[0])}</b> <small>${promo ? `<del>${R(x[2][pzSize])}</del> ` : ""}${R(p)}${off ? " · indisponível" : ""}</small><em>${esc(x[1])}</em></span></label>`;
     }).join("")}</fieldset>`;
   }).join("");
+}
+/* Mostra "2 de 3 sabores" e bloqueia o resto quando o limite do tamanho é atingido */
+function syncFlavorLimit() {
+  const n = chosenFlavors().length, max = PIZZA_LIMITS[pzSize];
+  document.querySelectorAll("#pzflavors input").forEach(el => {
+    const off = !isAvailable(`${el.dataset.ci}-${el.dataset.ii}-${pzSize}`);
+    el.disabled = off || (!el.checked && n >= max);
+  });
+  $("#pzcount").textContent = `${n} de ${max} ${max === 1 ? "sabor escolhido" : "sabores escolhidos"}`;
 }
 function updatePizzaLimit() {
   const c = pzCombo && PIZZA_COMBOS.find(x => x.id === pzCombo);
@@ -289,6 +353,7 @@ function openPizza(size, comboId = null) {
   fillOptional($("#pzbat"), pick(["Acompanhamentos"]));
   fillOptional($("#pzdrink"), pick(["Bebidas"]));
   renderPizzaFlavors();
+  syncFlavorLimit();
   if (comboId) {
     const c = PIZZA_COMBOS.find(x => x.id === comboId);
     const drink = pick(["Bebidas"]).find(x => c.drink.test(x.n)), bat = pick(["Acompanhamentos"]).find(x => x.n === c.batName);
@@ -322,12 +387,30 @@ function buildWhatsAppLink() {
   if (obs) m += `\n*Observações do pedido:* ${obs}`;
   $("#send").href = `https://wa.me/${CFG.wa}?text=${encodeURIComponent(m)}`;
 }
+const DRINK_RE = /refrigerante|suco|água|agua|coca|guaraná|fanta|pepsi|baré|tuchaua/i, SIDE_RE = /batata|nugget|barca/i;
+function cartHas(catName, re) {
+  return Object.keys(cart).some(k => combos[k]
+    ? re.test((combos[k].n || "") + " " + (combos[k].d || ""))
+    : MENU[(flat.find(x => x.k === k) || {}).ci]?.n === catName);
+}
+function upsellHtml() {
+  if (!itemCount()) return "";
+  const sets = [];
+  if (!cartHas("Bebidas", DRINK_RE)) sets.push(["Que tal uma bebida?", UPSELL_DRINKS]);
+  if (!cartHas("Acompanhamentos", SIDE_RE)) sets.push(["Que tal uma batata ou petisco?", UPSELL_SIDES]);
+  return sets.map(([title, list]) => {
+    const items = list.map(findItem).filter(x => x && isAvailable(x.k));
+    if (!items.length) return "";
+    return `<div class="upsell"><b>${title}</b><div class="up-row">${items.map(x => `<button type="button" class="up-btn" data-a="p" data-k="${x.k}"><span>${esc(x.n)}</span><b>+ ${R(by(x.k).p)}</b></button>`).join("")}</div></div>`;
+  }).join("");
+}
 function renderCart() {
   const keys = Object.keys(cart);
   $("#bar").hidden = !keys.length;
   $("#bc").textContent = itemCount() + (itemCount() === 1 ? " item" : " itens");
   $("#bt").textContent = R(subtotal());
   $("#lines").innerHTML = keys.length ? cartLines() : "<p>Seu carrinho está vazio. Adicione itens do cardápio.</p>";
+  $("#upsell").innerHTML = upsellHtml();
   $("#adr").hidden = !isDelivery();
   $("#rs").textContent = R(subtotal());
   $("#rf").textContent = isDelivery() ? R(CFG.fee) : "Retirada";
@@ -339,9 +422,22 @@ function renderCart() {
   buildWhatsAppLink();
 }
 
-const FIELDS = ["nm", "ph", "ad", "rf2", "orderobs"];
+const FIELDS = ["nm", "ph", "ad", "rf2"];
 const persistFields = () => lsSet("ml_f", Object.fromEntries(FIELDS.map(i => [i, $("#" + i).value])));
 (() => { const s = lsGet("ml_f", {}); FIELDS.forEach(i => { if (s[i]) $("#" + i).value = s[i]; }); })();
+const savePrefs = () => lsSet("ml_pref", { t: $("input[name=t]:checked").value, pay: $("#pay").value });
+(() => {
+  const p = lsGet("ml_pref", {});
+  const r = p.t && document.querySelector(`input[name=t][value="${p.t}"]`);
+  if (r) r.checked = true;
+  if (p.pay && [...$("#pay").options].some(o => o.value === p.pay)) $("#pay").value = p.pay;
+})();
+function forgetData() {
+  lsSet("ml_f", {}); lsSet("ml_pref", {});
+  FIELDS.forEach(i => { $("#" + i).value = ""; });
+  buildWhatsAppLink();
+  showToast("Seus dados foram apagados deste aparelho.");
+}
 
 /* ===== Janelas e avisos ===== */
 let toastTimer;
@@ -351,7 +447,7 @@ function showToast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.hidden = true; }, 2400);
 }
-const MODALS = ["#dr", "#cbm", "#pizzam"];
+const MODALS = ["#dr", "#cbm", "#pizzam", "#okm"];
 function openModal(sel) { $(sel).hidden = false; document.body.style.overflow = "hidden"; }
 function closeModal(sel) {
   $(sel).hidden = true;
@@ -397,6 +493,8 @@ document.addEventListener("click", e => {
     case "pzb": openPizza(b.dataset.size); return;
     case "pzcombo": { const c = PIZZA_COMBOS.find(x => x.id === k); if (c) openPizza(c.size, c.id); return; }
     case "pzc": closeModal("#pizzam"); return;
+    case "okx": closeModal("#okm"); return;
+    case "forget": forgetData(); return;
     default: changeCart(a, k);
   }
 });
@@ -408,7 +506,7 @@ $("#dr").addEventListener("input", e => {
   e.target.classList.remove("invalid");
   persistFields(); buildWhatsAppLink();
 });
-$("#dr").addEventListener("change", renderCart);
+$("#dr").addEventListener("change", () => { savePrefs(); renderCart(); });
 $("#q").addEventListener("input", renderMenu);
 
 async function copyPix(btn) {
@@ -434,7 +532,13 @@ $("#cbadd").addEventListener("click", () => {
 });
 
 /* Pizzas */
-$("#pzs").addEventListener("change", () => { pzSize = Number($("#pzs").value); updatePizzaLimit(); renderPizzaFlavors(); pizzaPrice(); });
+$("#pzs").addEventListener("change", () => {
+  const keep = chosenFlavors().map(x => `${x.ci}-${x.ii}`);   // mantém os sabores já escolhidos ao trocar o tamanho
+  pzSize = Number($("#pzs").value);
+  updatePizzaLimit();
+  renderPizzaFlavors(new Set(keep.slice(0, PIZZA_LIMITS[pzSize])));
+  syncFlavorLimit(); pizzaPrice();
+});
 $("#pzbat").addEventListener("change", pizzaPrice);
 $("#pzdrink").addEventListener("change", pizzaPrice);
 $("#pzflavors").addEventListener("change", e => {
@@ -442,7 +546,7 @@ $("#pzflavors").addEventListener("change", e => {
     e.target.checked = false;
     showToast(`Este tamanho permite até ${PIZZA_LIMITS[pzSize]} sabor(es).`);
   }
-  pizzaPrice();
+  syncFlavorLimit(); pizzaPrice();
 });
 $("#pzadd").addEventListener("click", () => {
   const d = pizzaPrice();
@@ -474,16 +578,30 @@ function validateOrder() {
   if (bad.length) $(bad[0]).focus();
   return errors;
 }
-function afterOrderSent() {
+function afterOrderSent(info) {
   cart = {}; notes = {}; combos = {};
+  $("#orderobs").value = ""; $("#tr").value = "";
   saveCart(); renderMenu(); renderCart(); closeModal("#dr");
+  if (info) showConfirm(info);
+}
+function showConfirm(i) {
+  const first = String(i.name || "").trim().split(/\s+/)[0];
+  $("#okmsg").textContent = `${first ? first + ", seu" : "Seu"} pedido de ${R(i.total)} (${i.delivery ? "entrega" : "retirada no local"}) foi registrado. Falta só um passo: envie a mensagem pelo WhatsApp, que já vai pronta.`;
+  $("#okwa").href = i.waUrl;
+  const notesTxt = [];
+  if (i.pay === "Pix") notesTxt.push("Pagamento no Pix: faça o pagamento e envie o comprovante na conversa.");
+  if (!isOpenNow() && CFG.hours) notesTxt.push(`Estamos fechados agora: seu pedido será atendido a partir das ${fmtHour(CFG.hours[0])}.`);
+  $("#oknote").textContent = notesTxt.join(" ");
+  $("#oknote").hidden = !notesTxt.length;
+  openModal("#okm");
 }
 $("#send").addEventListener("click", async e => {
   if (sending) { e.preventDefault(); return; }
   const errors = validateOrder(), box = $("#err");
   if (errors.length) { e.preventDefault(); box.textContent = errors.join(" "); box.hidden = false; return; }
   box.hidden = true;
-  if (!db) { showToast("Pedido seguirá pelo WhatsApp."); setTimeout(afterOrderSent, 1500); return; }
+  const info = { name: $("#nm").value.trim(), total: grandTotal(), delivery: isDelivery(), pay: $("#pay").value, waUrl: $("#send").href };
+  if (!db) { showToast("Pedido seguirá pelo WhatsApp."); setTimeout(() => afterOrderSent(info), 1500); return; }
 
   e.preventDefault();
   sending = true;
@@ -513,8 +631,7 @@ $("#send").addEventListener("click", async e => {
     });
     if (error) throw error;
     if (win) win.location = waUrl; else location.href = waUrl;
-    showToast("Pedido registrado! Finalize o envio pelo WhatsApp.");
-    afterOrderSent();
+    afterOrderSent(info);
   } catch (err) {
     if (win) win.close();
     box.textContent = "Não foi possível registrar o pedido agora. Verifique sua conexão e tente novamente, ou chame a gente direto no WhatsApp.";
@@ -527,15 +644,46 @@ $("#send").addEventListener("click", async e => {
 
 /* ===== Inicialização ===== */
 $("#pk").textContent = CFG.pix.key;
-$("#tabs").innerHTML = [["Combos", "combos"], ...MENU.map((c, i) => [NAV_LABELS[c.n] || c.n, "c" + i])]
+$("#tabs").innerHTML = [...(FAVORITES.some(findItem) ? [["⭐ Mais pedidos", "favs"]] : []), ["Combos", "combos"], ...MENU.map((c, i) => [NAV_LABELS[c.n] || c.n, "c" + i])]
   .map(t => `<button data-a="go" data-k="${t[1]}">${t[0]}</button>`).join("");
 $("#waTop").href = `https://wa.me/${CFG.wa}?text=` + encodeURIComponent("Olá! Vim pelo site e gostaria de fazer um pedido.");
-(function status() {
-  const s = $("#st"), on = isOpenNow();
-  s.hidden = false; s.textContent = on ? "Aberto agora" : "Fechado";
+function fmtHour(h) {
+  const hh = String(Math.floor(h) % 24).padStart(2, "0"), mm = Math.round((h % 1) * 60);
+  return mm ? `${hh}h${String(mm).padStart(2, "0")}` : `${hh}h`;
+}
+function updateStatus() {
+  const s = $("#st"), on = isOpenNow(), h = CFG.hours;
+  s.hidden = false;
+  s.textContent = !h ? (on ? "Aberto agora" : "Fechado") : on ? `Aberto · até ${fmtHour(h[1])}` : `Fechado · abre ${fmtHour(h[0])}`;
   s.classList.toggle("off", !on);
-})();
+  const n = $("#openNote");
+  n.hidden = on;
+  if (!on && h) n.textContent = `Estamos fechados agora. Você já pode montar o pedido e enviar: ele será atendido a partir das ${fmtHour(h[0])}.`;
+}
+updateStatus();
+setInterval(updateStatus, 60000);
 renderMenu();
 renderCart();
 syncAvailability();
 setInterval(syncAvailability, 120000); // atualiza disponibilidade e promoções a cada 2 min
+
+/* Destaca no topo a categoria que está na tela */
+function markActiveTab(id) {
+  const bar = $("#tabs");
+  bar.querySelectorAll("button").forEach(b => {
+    const on = b.dataset.k === id;
+    b.classList.toggle("on", on);
+    if (on) bar.scrollTo({ left: b.offsetLeft - (bar.clientWidth - b.offsetWidth) / 2, behavior: "auto" });
+  });
+}
+let tabTick = false;
+function updateActiveTab() {
+  tabTick = false;
+  let cur = null;
+  ["favs", "combos", ...MENU.map((_, i) => "c" + i)].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.getBoundingClientRect().top <= 170) cur = id;
+  });
+  markActiveTab(cur);
+}
+addEventListener("scroll", () => { if (!tabTick) { tabTick = true; requestAnimationFrame(updateActiveTab); } }, { passive: true });
